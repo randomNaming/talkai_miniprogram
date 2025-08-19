@@ -1,0 +1,45 @@
+<!--pages/profile/profile.wxml-->
+<view class="profile-container">
+  <!-- User Header -->
+  <view class="profile-header">
+    <image class="avatar" src="{{userInfo.avatar_url}}" mode="aspectFill"></image>
+    <text class="nickname">{{userInfo.nickname || '英语学习者'}}</text>
+    <text class="user-level">{{userInfo.grade || 'Primary School'}}</text>
+  </view>
+
+  <!-- Statistics -->
+  <view class="stats-section">
+    <text class="section-title">学习统计</text>
+    <view class="stats-grid">
+      <view class="stat-item">
+        <text class="stat-number">{{stats.chat_history_count}}</text>
+        <text class="stat-label">对话次数</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-number">{{stats.vocab_count}}</text>
+        <text class="stat-label">学习词汇</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-number">{{Math.floor(stats.total_usage_time / 3600)}}</text>
+        <text class="stat-label">学习时长(小时)</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-number">{{stats.days_since_registration}}</text>
+        <text class="stat-label">加入天数</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- Actions -->
+  <view class="actions-section">
+    <button class="action-btn" bindtap="onSync">
+      <text class="action-icon">🔄</text>
+      <text class="action-text">同步数据</text>
+    </button>
+    
+    <button class="action-btn danger" bindtap="onLogout">
+      <text class="action-icon">🚪</text>
+      <text class="action-text">退出登录</text>
+    </button>
+  </view>
+</view>

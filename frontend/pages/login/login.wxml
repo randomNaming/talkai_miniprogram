@@ -1,0 +1,76 @@
+<!--pages/login/login.wxml-->
+<view class="login-container">
+  <!-- Logo Section -->
+  <view class="logo-section">
+    <view class="logo">
+      <image src="../../images/logo.png" mode="aspectFit"></image>
+    </view>
+    <view class="app-title">小Y语伴</view>
+    <view class="app-subtitle">AI智能英语对话练习</view>
+  </view>
+
+  <!-- Welcome Section -->
+  <view class="welcome-section">
+    <view class="welcome-title">欢迎使用TalkAI</view>
+    <view class="welcome-desc">
+      <view class="feature-item">
+        <text class="feature-icon">💬</text>
+        <text class="feature-text">智能AI对话练习</text>
+      </view>
+      <view class="feature-item">
+        <text class="feature-icon">✅</text>
+        <text class="feature-text">实时语法纠错</text>
+      </view>
+      <view class="feature-item">
+        <text class="feature-icon">📚</text>
+        <text class="feature-text">个性化词汇管理</text>
+      </view>
+      <view class="feature-item">
+        <text class="feature-icon">🔍</text>
+        <text class="feature-text">40万词典查询</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- Login Section -->
+  <view class="login-section">
+    <view class="auto-login-info">
+      <view class="login-status">
+        <text wx:if="{{!isLogging}}">正在为您准备学习环境...</text>
+        <text wx:else>登录中，请稍候...</text>
+      </view>
+      <view class="loading-indicator" wx:if="{{isLogging}}">
+        <view class="loading-dot"></view>
+        <view class="loading-dot"></view>
+        <view class="loading-dot"></view>
+      </view>
+    </view>
+    
+    <view class="login-tips">
+      <view class="tips-item">
+        <text class="tips-icon">🔒</text>
+        <text class="tips-text">我们会保护您的隐私和数据安全</text>
+      </view>
+      <view class="tips-item">
+        <text class="tips-icon">☁️</text>
+        <text class="tips-text">学习数据云端同步，随时随地访问</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- Footer -->
+  <view class="footer">
+    <text class="footer-text">继续使用即表示同意</text>
+    <text class="footer-link">《用户协议》</text>
+    <text class="footer-text">和</text>
+    <text class="footer-link">《隐私政策》</text>
+  </view>
+
+  <!-- Loading Modal -->
+  <view class="loading-modal" wx:if="{{isLogging}}">
+    <view class="loading-content">
+      <view class="loading-spinner"></view>
+      <text class="loading-text">正在登录...</text>
+    </view>
+  </view>
+</view>

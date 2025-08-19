@@ -1,0 +1,210 @@
+<!--pages/chat/chat.wxml-->
+<view class="chat-container">
+  <!-- Header -->
+  <view class="chat-header">
+    <view class="header-content">
+      <view class="chat-title">Chat</view>
+      <view class="chat-status">
+        <text class="status-dot {{isOnline ? 'online' : 'offline'}}"></text>
+        <text class="status-text">{{isOnline ? '小Y在线' : '连接中...'}}</text>
+      </view>
+    </view>
+    <view class="header-actions">
+      <button class="action-btn" bindtap="onClearChat">
+        <text class="action-icon">🗑️</text>
+      </button>
+      <button class="action-btn" bindtap="onShowSettings">
+        <text class="action-icon">⚙️</text>
+      </button>
+    </view>
+  </view>
+
+  <!-- Messages Area -->
+  <scroll-view 
+    class="messages-container" 
+    scroll-y="true" 
+    scroll-top="{{scrollTop}}"
+    scroll-into-view="{{scrollToView}}"
+    enhanced="true"
+    show-scrollbar="false"
+  >
+    <view class="messages-list">
+      <!-- Welcome Message -->
+      <view class="message-item ai-message" wx:if="{{messages.length === 0}}">
+        <view class="message-avatar">
+          <text class="avatar-icon">🤖</text>
+        </view>
+        <view class="message-content">
+          <view class="message-bubble">
+            <text class="message-text">{{welcomeMessage}}</text>
+          </view>
+          <view class="message-time">{{welcomeTime}}</view>
+        </view>
+      </view>
+
+      <!-- Chat Messages -->
+      <view 
+        class="message-item {{item.type === 'user' ? 'user-message' : 'ai-message'}}"
+        wx:for="{{messages}}" 
+        wx:key="id"
+        id="msg-{{item.id}}"
+      >
+        <view class="message-avatar" wx:if="{{item.type === 'ai'}}">
+          <text class="avatar-icon">🤖</text>
+        </view>
+        
+        <view class="message-content">
+          <view class="message-bubble">
+            <text class="message-text" selectable="true">{{item.content}}</text>
+            
+            <!-- Grammar Correction -->
+            <view class="grammar-correction" wx:if="{{item.grammar_check && item.grammar_check.has_error}}">
+              <view class="correction-header">
+                <text class="correction-icon">✏️</text>
+                <text class="correction-title">语法纠正</text>
+              </view>
+              <view class="correction-content">
+                <text class="corrected-text">{{item.grammar_check.corrected_input}}</text>
+              </view>
+              <!-- Vocabulary to learn -->
+              <view class="vocab-to-learn" wx:if="{{item.grammar_check.vocab_to_learn.length > 0}}">
+                <text class="vocab-title">需要学习的词汇：</text>
+                <view class="vocab-list">
+                  <view 
+                    class="vocab-item" 
+                    wx:for="{{item.grammar_check.vocab_to_learn}}" 
+                    wx:for-item="vocab"
+                    wx:key="original"
+                    bindtap="onAddVocab"
+                    data-vocab="{{vocab}}"
+                  >
+                    <text class="vocab-original">{{vocab.original}}</text>
+                    <text class="vocab-arrow">→</text>
+                    <text class="vocab-corrected">{{vocab.corrected}}</text>
+                    <text class="vocab-add-btn">+</text>
+                  </view>
+                </view>
+              </view>
+            </view>
+          </view>
+          
+          <view class="message-time">{{item.time}}</view>
+          
+          <!-- Message Actions -->
+          <view class="message-actions" wx:if="{{item.type === 'ai'}}">
+            <button class="action-btn-small" bindtap="onCopyMessage" data-content="{{item.content}}">
+              <text class="action-icon-small">📋</text>
+            </button>
+            <button class="action-btn-small" bindtap="onTranslateMessage" data-content="{{item.content}}">
+              <text class="action-icon-small">🔤</text>
+            </button>
+          </view>
+        </view>
+        
+        <view class="message-avatar" wx:if="{{item.type === 'user'}}">
+          <image class="avatar-img" src="{{userAvatar}}" mode="aspectFill"></image>
+        </view>
+      </view>
+
+      <!-- Loading Message -->
+      <view class="message-item ai-message" wx:if="{{isLoading}}">
+        <view class="message-avatar">
+          <text class="avatar-icon">🤖</text>
+        </view>
+        <view class="message-content">
+          <view class="message-bubble loading-bubble">
+            <view class="typing-indicator">
+              <view class="typing-dot"></view>
+              <view class="typing-dot"></view>
+              <view class="typing-dot"></view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+
+  <!-- Input Area -->
+  <view class="input-area">
+    <view class="input-container">
+      <textarea 
+        class="message-input"
+        placeholder="输入英文消息开始对话..."
+        value="{{inputText}}"
+        bindinput="onInputChange"
+        bindconfirm="onSendMessage"
+        confirm-type="send"
+        maxlength="500"
+        auto-height="true"
+        disabled="{{isLoading}}"
+      ></textarea>
+      
+      <view class="input-actions">
+        <button 
+          class="send-btn {{inputText.length > 0 ? 'active' : ''}}"
+          bindtap="onSendMessage"
+          disabled="{{isLoading || inputText.length === 0}}"
+        >
+          <text class="send-icon" wx:if="{{!isLoading}}">📤</text>
+          <text class="send-icon" wx:else>⏳</text>
+        </button>
+      </view>
+    </view>
+    
+    <!-- Quick Actions -->
+    <view class="quick-actions" wx:if="{{showQuickActions}}">
+      <button class="quick-btn" bindtap="onQuickAction" data-action="greeting">
+        <text class="quick-text">Hello!</text>
+      </button>
+      <button class="quick-btn" bindtap="onQuickAction" data-action="introduce">
+        <text class="quick-text">自我介绍</text>
+      </button>
+      <button class="quick-btn" bindtap="onQuickAction" data-action="help">
+        <text class="quick-text">需要帮助</text>
+      </button>
+      <button class="quick-btn" bindtap="onQuickAction" data-action="topic">
+        <text class="quick-text">换个话题</text>
+      </button>
+    </view>
+  </view>
+
+  <!-- Settings Modal -->
+  <view class="settings-modal" wx:if="{{showSettings}}">
+    <view class="modal-overlay" bindtap="onHideSettings"></view>
+    <view class="modal-content">
+      <view class="modal-header">
+        <text class="modal-title">对话设置</text>
+        <button class="modal-close" bindtap="onHideSettings">×</button>
+      </view>
+      <view class="modal-body">
+        <view class="setting-item">
+          <text class="setting-label">显示语法纠正</text>
+          <switch 
+            class="setting-switch" 
+            checked="{{settings.showGrammarCorrection}}"
+            bindchange="onSettingChange"
+            data-key="showGrammarCorrection"
+          ></switch>
+        </view>
+        <view class="setting-item">
+          <text class="setting-label">包含对话历史</text>
+          <switch 
+            class="setting-switch" 
+            checked="{{settings.includeHistory}}"
+            bindchange="onSettingChange"
+            data-key="includeHistory"
+          ></switch>
+        </view>
+        <view class="setting-item">
+          <text class="setting-label">显示快捷操作</text>
+          <switch 
+            class="setting-switch" 
+            checked="{{settings.showQuickActions}}"
+            bindchange="onSettingChange"
+            data-key="showQuickActions"
+          ></switch>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

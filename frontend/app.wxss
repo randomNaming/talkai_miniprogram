@@ -1,0 +1,371 @@
+/**app.wxss**/
+
+/* Global Styles for TalkAI Mini Program */
+
+/* Color Palette */
+:root {
+  --primary-color: #2C5AA0;
+  --primary-light: #4A7BC8;
+  --primary-dark: #1E3F70;
+  --secondary-color: #28A745;
+  --accent-color: #FFC107;
+  --danger-color: #DC3545;
+  --warning-color: #FD7E14;
+  --info-color: #17A2B8;
+  --light-color: #F8F9FA;
+  --dark-color: #343A40;
+  --gray-color: #6C757D;
+  --border-color: #DEE2E6;
+}
+
+/* Basic Reset */
+page {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background-color: #F8F9FA;
+  color: #333;
+  line-height: 1.6;
+  font-size: 28rpx;
+}
+
+/* Container */
+.container {
+  padding: 20rpx;
+  max-width: 750rpx;
+  margin: 0 auto;
+}
+
+/* Card Styles */
+.card {
+  background: #FFFFFF;
+  border-radius: 16rpx;
+  box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.1);
+  margin-bottom: 20rpx;
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 30rpx;
+  border-bottom: 2rpx solid #F1F3F4;
+  font-weight: 600;
+  font-size: 32rpx;
+  color: #2C5AA0;
+}
+
+.card-body {
+  padding: 30rpx;
+}
+
+.card-footer {
+  padding: 20rpx 30rpx;
+  background-color: #F8F9FA;
+  border-top: 2rpx solid #F1F3F4;
+}
+
+/* Button Styles */
+.btn {
+  padding: 20rpx 40rpx;
+  border-radius: 12rpx;
+  border: none;
+  font-size: 28rpx;
+  font-weight: 500;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  line-height: 1;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #2C5AA0 0%, #4A7BC8 100%);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #1E3F70 0%, #2C5AA0 100%);
+}
+
+.btn-secondary {
+  background: #6C757D;
+  color: white;
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #28A745 0%, #32CD32 100%);
+  color: white;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 2rpx solid #2C5AA0;
+  color: #2C5AA0;
+}
+
+.btn-outline:hover {
+  background: #2C5AA0;
+  color: white;
+}
+
+.btn-small {
+  padding: 12rpx 24rpx;
+  font-size: 24rpx;
+  border-radius: 8rpx;
+}
+
+.btn-large {
+  padding: 28rpx 56rpx;
+  font-size: 32rpx;
+}
+
+.btn-block {
+  width: 100%;
+  display: block;
+}
+
+.btn-disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Input Styles */
+.input-group {
+  margin-bottom: 30rpx;
+}
+
+.input-label {
+  display: block;
+  margin-bottom: 12rpx;
+  font-weight: 500;
+  color: #495057;
+  font-size: 26rpx;
+}
+
+.input {
+  width: 100%;
+  padding: 24rpx;
+  border: 2rpx solid #DEE2E6;
+  border-radius: 12rpx;
+  background: #FFFFFF;
+  font-size: 28rpx;
+  color: #495057;
+  box-sizing: border-box;
+}
+
+.input:focus {
+  border-color: #2C5AA0;
+  outline: none;
+}
+
+.input-error {
+  border-color: #DC3545;
+}
+
+.input-success {
+  border-color: #28A745;
+}
+
+.textarea {
+  min-height: 120rpx;
+  resize: vertical;
+}
+
+/* List Styles */
+.list {
+  background: white;
+  border-radius: 16rpx;
+  overflow: hidden;
+}
+
+.list-item {
+  padding: 30rpx;
+  border-bottom: 2rpx solid #F1F3F4;
+  display: flex;
+  align-items: center;
+  transition: background-color 0.3s ease;
+}
+
+.list-item:last-child {
+  border-bottom: none;
+}
+
+.list-item:hover {
+  background-color: #F8F9FA;
+}
+
+.list-item-content {
+  flex: 1;
+}
+
+.list-item-title {
+  font-size: 30rpx;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 8rpx;
+}
+
+.list-item-desc {
+  font-size: 24rpx;
+  color: #6C757D;
+}
+
+.list-item-action {
+  margin-left: 20rpx;
+}
+
+/* Avatar */
+.avatar {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #F1F3F4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 20rpx;
+}
+
+.avatar-large {
+  width: 120rpx;
+  height: 120rpx;
+}
+
+.avatar-small {
+  width: 60rpx;
+  height: 60rpx;
+}
+
+/* Badge */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6rpx 12rpx;
+  font-size: 20rpx;
+  font-weight: 600;
+  border-radius: 20rpx;
+  line-height: 1;
+}
+
+.badge-primary {
+  background: #2C5AA0;
+  color: white;
+}
+
+.badge-success {
+  background: #28A745;
+  color: white;
+}
+
+.badge-warning {
+  background: #FFC107;
+  color: #333;
+}
+
+.badge-danger {
+  background: #DC3545;
+  color: white;
+}
+
+/* Loading */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60rpx;
+  color: #6C757D;
+}
+
+.loading-text {
+  margin-top: 20rpx;
+  font-size: 26rpx;
+}
+
+/* Empty State */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120rpx 40rpx;
+  color: #6C757D;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 120rpx;
+  margin-bottom: 30rpx;
+  opacity: 0.5;
+}
+
+.empty-title {
+  font-size: 32rpx;
+  margin-bottom: 12rpx;
+  color: #495057;
+}
+
+.empty-desc {
+  font-size: 26rpx;
+  line-height: 1.5;
+}
+
+/* Utility Classes */
+.text-center { text-align: center; }
+.text-left { text-align: left; }
+.text-right { text-align: right; }
+
+.text-primary { color: #2C5AA0; }
+.text-secondary { color: #6C757D; }
+.text-success { color: #28A745; }
+.text-danger { color: #DC3545; }
+.text-warning { color: #FFC107; }
+.text-info { color: #17A2B8; }
+
+.bg-primary { background-color: #2C5AA0; }
+.bg-light { background-color: #F8F9FA; }
+.bg-white { background-color: #FFFFFF; }
+
+.m-0 { margin: 0; }
+.m-1 { margin: 10rpx; }
+.m-2 { margin: 20rpx; }
+.m-3 { margin: 30rpx; }
+
+.mb-0 { margin-bottom: 0; }
+.mb-1 { margin-bottom: 10rpx; }
+.mb-2 { margin-bottom: 20rpx; }
+.mb-3 { margin-bottom: 30rpx; }
+
+.p-0 { padding: 0; }
+.p-1 { padding: 10rpx; }
+.p-2 { padding: 20rpx; }
+.p-3 { padding: 30rpx; }
+
+.flex { display: flex; }
+.flex-column { flex-direction: column; }
+.flex-center { align-items: center; justify-content: center; }
+.flex-between { justify-content: space-between; }
+.flex-end { justify-content: flex-end; }
+
+.hidden { display: none; }
+.visible { visibility: visible; }
+.invisible { visibility: hidden; }
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20rpx); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.pulse {
+  animation: pulse 1.5s ease-in-out infinite;
+}

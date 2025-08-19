@@ -1,0 +1,54 @@
+{
+  "pages": [
+    "pages/chat/chat",
+    "pages/vocab/vocab",
+    "pages/profile/profile",
+    "pages/dict/dict",
+    "pages/login/login"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#2C5AA0",
+    "navigationBarTitleText": "TalkAI英语学习",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#F8F9FA"
+  },
+  "tabBar": {
+    "color": "#666666",
+    "selectedColor": "#2C5AA0",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/chat/chat",
+        "text": "对话",
+        "iconPath": "images/chat.png",
+        "selectedIconPath": "images/chat_active.png"
+      },
+      {
+        "pagePath": "pages/vocab/vocab",
+        "text": "词汇",
+        "iconPath": "images/vocab.png",
+        "selectedIconPath": "images/vocab_active.png"
+      },
+      {
+        "pagePath": "pages/dict/dict",
+        "text": "词典",
+        "iconPath": "images/dict.png",
+        "selectedIconPath": "images/dict_active.png"
+      },
+      {
+        "pagePath": "pages/profile/profile",
+        "text": "我的",
+        "iconPath": "images/profile.png",
+        "selectedIconPath": "images/profile_active.png"
+      }
+    ]
+  },
+  "networkTimeout": {
+    "request": 30000,
+    "downloadFile": 30000
+  },
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

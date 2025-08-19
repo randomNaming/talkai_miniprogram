@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "AI对话练习",
+  "navigationStyle": "custom",
+  "enablePullDownRefresh": false,
+  "onReachBottomDistance": 50
+}

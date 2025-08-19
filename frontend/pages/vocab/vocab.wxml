@@ -1,0 +1,54 @@
+<!--pages/vocab/vocab.wxml-->
+<view class="vocab-container">
+  <!-- Header with Search -->
+  <view class="vocab-header">
+    <view class="search-container">
+      <input 
+        class="search-input" 
+        placeholder="搜索词汇..."
+        value="{{searchText}}"
+        bindinput="onSearchInput"
+      />
+      <button class="search-btn" bindtap="onSearch">🔍</button>
+    </view>
+    <view class="stats-bar">
+      <text class="stats-item">总词汇: {{totalWords}}</text>
+      <text class="stats-item">已掌握: {{masteredWords}}</text>
+      <text class="stats-item">学习中: {{learningWords}}</text>
+    </view>
+  </view>
+
+  <!-- Vocabulary List -->
+  <scroll-view class="vocab-list" scroll-y="true" enhanced="true">
+    <view wx:if="{{vocabList.length === 0}}" class="empty-state">
+      <text class="empty-icon">📚</text>
+      <text class="empty-title">还没有添加词汇</text>
+      <text class="empty-desc">在对话中遇到生词时会自动添加到这里</text>
+    </view>
+
+    <view 
+      class="vocab-item" 
+      wx:for="{{vocabList}}" 
+      wx:key="id"
+      bindtap="onVocabTap"
+      data-vocab="{{item}}"
+    >
+      <view class="vocab-main">
+        <view class="vocab-word">{{item.word}}</view>
+        <view class="vocab-phonetic" wx:if="{{item.phonetic}}">{{item.phonetic}}</view>
+      </view>
+      <view class="vocab-meaning">{{item.translation || item.definition}}</view>
+      <view class="vocab-meta">
+        <text class="vocab-source">{{item.source}}</text>
+        <view class="vocab-mastery {{item.is_mastered ? 'mastered' : 'learning'}}">
+          {{item.is_mastered ? '已掌握' : '学习中'}}
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+
+  <!-- Add Button -->
+  <button class="add-btn" bindtap="onAddVocab">
+    <text class="add-icon">+</text>
+  </button>
+</view>
