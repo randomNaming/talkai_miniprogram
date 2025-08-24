@@ -1,6 +1,28 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## 开发环境设置
+
+### 当前开发模式：本地前端 + 本地后端开发
+- **环境自动检测**：前端会自动检测运行环境并切换API地址
+- **本地开发**：微信开发者工具中运行 → 使用 `http://localhost:8000/api/v1`
+- **生产环境**：真实微信环境中运行 → 使用 `https://api.jimingge.net/api/v1`
+
+### 本地开发启动流程
+1. **启动本地后端**：
+   ```bash
+   cd backend
+   uvicorn main:app --reload --host 0.0.0.0 --port 8000
+   ```
+
+2. **启动前端开发**：
+   - 打开微信开发者工具
+   - 导入 `frontend/` 目录
+   - 前端会自动使用本地API：`http://localhost:8000/api/v1`
+
+### 环境配置文件
+- `config/env.js`：自动环境检测和API地址切换
+- 开发环境：自动检测微信开发者工具环境
+- 生产环境：自动检测真实微信环境
 
 ## Project Overview
 

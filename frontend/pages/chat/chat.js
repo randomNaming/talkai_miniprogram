@@ -2,6 +2,7 @@
 const app = getApp();
 const api = require('../../services/api');
 const storage = require('../../utils/storage');
+const envConfig = require('../../config/env');
 
 Page({
   data: {
@@ -368,9 +369,14 @@ Page({
     // Send message using dict AI chat endpoint (no authentication required)
     console.log('Sending chat message via dict AI endpoint...');
     
+    // Get current environment config for API URL
+    const config = envConfig.getConfig();
+    const apiUrl = `${config.API_BASE_URL}/dict/ai-chat`;
+    console.log('Using API URL:', apiUrl);
+    
     // Use the dict AI chat endpoint that works like /dict/query
     wx.request({
-      url: 'https://api.jimingge.net/api/v1/dict/ai-chat',
+      url: apiUrl,
       method: 'POST',
       header: {
         'Content-Type': 'application/json'

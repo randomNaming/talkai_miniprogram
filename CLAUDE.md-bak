@@ -1,36 +1,16 @@
 # CLAUDE.md
 
-## 开发环境设置
+## 本地开发
+请激活虚拟开发环境
+source /Users/pean/aiproject/talkai_py/bookvidenv   
+cd /Users/pean/aiproject/talkai_mini/backend
+  uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
-### 当前开发模式：本地前端 + 本地后端
-- **前端**：WeChat Mini Program 运行在微信开发者工具
-- **后端**：FastAPI 使用 uvicorn 本地启动
-- **API Base URL**：`http://localhost:8000/api/v1` (本地开发)
-- **部署 Base URL**：`https://api.jimingge.net/api/v1` (生产环境)
 
-### 本地开发启动命令
+## 线上部署：用 Docker 
 
-**后端启动**：
-```bash
-cd backend
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
 
-**前端开发**：
-1. 打开微信开发者工具
-2. 导入 `frontend/` 目录
-3. 前端会自动检测开发环境并使用本地API
-
-### 环境自动切换
-前端通过 `frontend/config/env.js` 自动检测运行环境：
-- **开发环境**：微信开发者工具中运行 → 使用 `http://localhost:8000/api/v1`
-- **生产环境**：真实微信环境中运行 → 使用 `https://api.jimingge.net/api/v1`
-
-### 重要提醒
-- **服务器部署**：使用 `uvicorn main:app --host 0.0.0.0 --port 8000 --reload` 而不是 Docker
-- **代理设置**：中国国内服务（WeChat、Moonshot等）不使用代理，海外服务（OpenAI）可能需要代理
-
-## The following content  provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## The following content provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ## 部署请参考 deploy_problem.md 中的 “快速部署指南”
 ## Project Overview
 
@@ -64,13 +44,10 @@ cd backend
 # Install dependencies
 pip install -r requirements.txt
 
-# Run local development server (recommended)
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-
-# Alternative: Run with Python directly
+# Run development server
 python main.py
 
-# Production deployment with Docker Compose (server only)
+# Run with Docker Compose
 docker-compose up -d
 
 # Check service health

@@ -1,9 +1,13 @@
 // API Service for TalkAI Mini Program
 const storage = require('../utils/storage');
+const envConfig = require('../config/env');
 
-// Configuration
-const BASE_URL = 'https://api.jimingge.net/api/v1';
+// Get environment-based configuration
+const config = envConfig.getConfig();
+const BASE_URL = config.API_BASE_URL;
 const REQUEST_TIMEOUT = 30000;
+
+console.log(`[API] Using base URL: ${BASE_URL} (env: ${config.ENVIRONMENT})`);
 
 /**
  * Get mock response for development mode
