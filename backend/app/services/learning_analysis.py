@@ -5,6 +5,7 @@ import asyncio
 from datetime import datetime
 from typing import List
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from loguru import logger
 
 from app.core.database import SessionLocal
@@ -32,7 +33,7 @@ class LearningAnalysisService:
                 .join(ChatRecord)
                 .filter(ChatRecord.is_processed == False)
                 .group_by(User.id)
-                .having(db.func.count(ChatRecord.id) >= settings.max_chat_records_per_analysis)
+                .having(func.count(ChatRecord.id) >= settings.max_chat_records_per_analysis)
                 .all()
             )
             

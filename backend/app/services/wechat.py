@@ -15,6 +15,9 @@ class WeChatService:
         self.app_id = settings.wechat_app_id
         self.app_secret = settings.wechat_app_secret
         self.session_url = "https://api.weixin.qq.com/sns/jscode2session"
+        
+        # Log configuration status (without exposing secret)
+        logger.info(f"WeChat service initialized - AppID: {self.app_id}, Secret: {'***' if self.app_secret else 'Not configured'}")
     
     async def get_session_info(self, js_code: str) -> Optional[Dict[str, Any]]:
         """
@@ -38,15 +41,29 @@ class WeChatService:
         }
         
         try:
-            async with httpx.AsyncClient() as client:
+            # Create client without proxy to avoid SOCKS issues  
+            async with httpx.AsyncClient(
+                timeout=30.0,
+                trust_env=False  # Don't use environment proxy settings
+            ) as client:
+                logger.debug(f"Calling WeChat API: {self.session_url}")
+                logger.debug(f"Params: appid={self.app_id}, js_code={js_code[:10]}...")
+                
                 response = await client.get(self.session_url, params=params)
                 response.raise_for_status()
                 data = response.json()
+                
+                logger.debug(f"WeChat API response: {data}")
                 
                 if "errcode" in data:
                     logger.error(f"WeChat API error: {data}")
                     return None
                 
+                if not data.get("openid"):
+                    logger.error(f"WeChat API returned no openid: {data}")
+                    return None
+                
+                logger.info(f"WeChat authentication successful, openid: {data.get('openid')[:8]}...")
                 return {
                     "openid": data.get("openid"),
                     "session_key": data.get("session_key"),

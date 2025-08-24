@@ -6,6 +6,9 @@ App({
   onLaunch: function () {
     console.log('TalkAI Mini Program Launched');
     
+    // Handle unhandled promise rejections
+    this.setupErrorHandlers();
+    
     // Initialize app data
     this.globalData = {
       userInfo: null,
@@ -22,6 +25,18 @@ App({
     
     // Initialize services
     this.initServices();
+  },
+
+  setupErrorHandlers: function() {
+    // Handle file system errors (like ad file reading errors)
+    wx.onError && wx.onError(function(err) {
+      // Ignore ad-related file errors
+      if (err && err.indexOf && err.indexOf('interstitialAdExtInfo.txt') !== -1) {
+        console.warn('Ignoring ad file error:', err);
+        return;
+      }
+      console.error('Global error:', err);
+    });
   },
 
   onShow: function () {

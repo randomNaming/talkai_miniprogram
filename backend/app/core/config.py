@@ -21,8 +21,8 @@ class Settings(BaseSettings):
     openai_api_key: Optional[str] = Field(default=None)
     
     # WeChat Mini Program
-    wechat_app_id: Optional[str] = Field(default=None)
-    wechat_app_secret: Optional[str] = Field(default=None)
+    wechat_app_id: Optional[str] = Field(default=None, alias="WECHAT_APP_ID")
+    wechat_app_secret: Optional[str] = Field(default=None, alias="WECHAT_APP_SECRET")
     
     # JWT Settings
     secret_key: str = Field(default="your-secret-key-change-in-production-min-32-chars")
@@ -79,6 +79,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+        populate_by_name = True  # Allow both field name and alias
 
 
 # Global settings instance

@@ -84,7 +84,10 @@ class AIService:
                 "max_tokens": 1000
             }
             
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(
+                timeout=30.0,
+                trust_env=False  # Don't use environment proxy settings
+            ) as client:
                 response = await client.post(self.moonshot_url, headers=headers, json=payload)
                 response.raise_for_status()
                 
@@ -110,7 +113,10 @@ class AIService:
                 "max_tokens": 1000
             }
             
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(
+                timeout=30.0,
+                trust_env=False  # Don't use environment proxy settings
+            ) as client:
                 response = await client.post(self.openai_url, headers=headers, json=payload)
                 response.raise_for_status()
                 

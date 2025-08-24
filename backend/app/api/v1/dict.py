@@ -186,3 +186,55 @@ async def dictionary_health():
             "dictionary_available": False,
             "message": f"Dictionary service error: {str(e)}"
         }
+
+
+@router.post("/ai-chat")
+async def dict_ai_chat(request: dict):
+    """
+    AI chat endpoint in dict module (no authentication required)
+    
+    This endpoint provides AI chat functionality without requiring authentication,
+    similar to how /dict/query works.
+    """
+    try:
+        from app.services.ai import ai_service
+        from datetime import datetime
+        
+        message = request.get("message", "").strip()
+        if not message:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Message is required"
+            )
+        
+        # Simple system prompt for anonymous chat
+        simple_system_prompt = """You are a helpful English learning assistant. 
+        Keep your responses friendly, encouraging, and at an intermediate level. 
+        Help users practice English conversation naturally."""
+        
+        messages = [
+            {"role": "system", "content": simple_system_prompt},
+            {"role": "user", "content": message}
+        ]
+        
+        # Call AI directly
+        response = await ai_service._call_ai_api(messages, temperature=0.8)
+        
+        if not response:
+            response = "Hello! I'm your English learning assistant. How can I help you practice English today?"
+        
+        return {
+            "response": response.strip(),
+            "grammar_check": None,
+            "suggested_vocab": [],
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Dict AI chat failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="AI chat service temporarily unavailable"
+        )

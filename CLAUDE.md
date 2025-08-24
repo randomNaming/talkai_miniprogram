@@ -1,10 +1,11 @@
 # CLAUDE.md
+
 ## very important 
 ### 由于服务器资源限制原因，实际在部署backend时使用了uvicorn main:app --host 0.0.0.0 --port 8000 --reload 而不是docker。
-### 服务器使用了clash，clash只是为了访问claude code 和chatgpt，google gemini使用。其他中国国内的访问，如wechat，tencent，或者中国国内大模型deepseek，moonshot 等请不要使用clash。
-###  当前是本地电脑开发环境，
+### 服务器使用了clash，clash只是为了访问claude code 和chatgpt，google gemini使用。其他中国国内的所有访问，如wechat，tencent，或者中国国内大模型deepseek，moonshot 等请不要使用clash。
+### 当前是本地电脑开发环境，不过/Users/pean/aiproject/talkai_mini/backend/ 已经和服务器端的backend/同步。可以直接 运行 ./Users/pean/aiproject/talkai_mini/deploy_up.sh 同步代码到到服务器。也可以 ssh jm "cd /www/wwwroot/talkai_miniprogram/backend" 到服务器后端执行启动等操作。请参考本地：/Users/pean/aiproject/talkai_mini/backend/deploy_up.sh 文件。
 
-## The following content  provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## The following content provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 ## 部署请参考 deploy_problem.md 中的 “快速部署指南”
 ## Project Overview
 

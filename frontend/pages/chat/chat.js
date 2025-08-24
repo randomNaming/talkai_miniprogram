@@ -108,9 +108,9 @@ Page({
       
       console.log('Current environment version:', envVersion);
       
-      // Only use mock in WeChat Developer Tools (develop version)
-      // Use real API in trial and release versions
-      return envVersion === 'develop';
+      // Use development mode only for WeChat Developer Tools simulator
+      // Real device preview should use production flow
+      return envVersion === 'develop' && this.isSimulator();
     } catch (error) {
       console.warn('Failed to get account info, assuming production:', error);
       return false; // Default to production if detection fails
@@ -118,91 +118,123 @@ Page({
   },
 
   /**
+   * Check if running in simulator vs real device
+   */
+  isSimulator: function() {
+    try {
+      const systemInfo = wx.getSystemInfoSync();
+      // Check if running in simulator (WeChat Developer Tools)
+      return systemInfo.platform === 'devtools';
+    } catch (error) {
+      return false;
+    }
+  },
+
+  /**
+   * Perform login with js_code and optional user info
+   */
+  performLogin: function(jsCode, userInfo, resolve, reject) {
+    const loginData = { 
+      js_code: jsCode,
+      nickname: userInfo?.nickName,
+      avatar_url: userInfo?.avatarUrl
+    };
+    
+    console.log('Calling backend login API...');
+    api.auth.wechatLogin(loginData).then(result => {
+      console.log('Backend login successful, token received:', !!result.access_token);
+      
+      // Create user info from login result
+      const completeUserInfo = {
+        id: result.user_id,
+        nickname: loginData.nickname || 'User',
+        avatar_url: loginData.avatar_url || '/images/default_avatar.png',
+        is_new_user: result.is_new_user
+      };
+      
+      console.log('User logged in:', completeUserInfo.nickname || completeUserInfo.id);
+      
+      // Save login state
+      app.login(completeUserInfo);
+      console.log('Authentication completed successfully');
+      resolve();
+    }).catch(err => {
+      console.error('Authentication failed:', err.message || err);
+      reject(err);
+    });
+  },
+
+  /**
    * Ensure authentication before API calls
    */
   ensureAuth: function() {
     return new Promise((resolve, reject) => {
+      console.log('ensureAuth called, isLoggedIn:', app.globalData.isLoggedIn);
+      
       // If already logged in, resolve immediately
-      if (app.globalData.isLoggedIn) {
+      if (app.globalData.isLoggedIn && storage.getToken()) {
+        console.log('Already authenticated, proceeding...');
         resolve();
         return;
       }
       
-      // In development environment, use mock authentication
-      if (this.isDevelopment()) {
-        console.log('Development environment detected, using mock auth');
-        this.mockLogin().then(() => {
-          resolve();
-        }).catch(err => {
-          reject(err);
-        });
-        return;
-      }
+      console.log('Need to authenticate, starting WeChat login...');
       
-      // Production environment: Get WeChat login code and authenticate
+      // Always try real WeChat login
       wx.login({
         success: (loginRes) => {
+          console.log('wx.login success, code:', loginRes.code ? 'received' : 'missing');
+          
           if (loginRes.code) {
-            // Login anonymously
-            const loginData = { js_code: loginRes.code };
-            
-            api.auth.wechatLogin(loginData).then(result => {
-              console.log('Quick auth successful');
-              
-              // Get user profile
-              return api.user.getProfile();
-            }).then(userInfo => {
-              // Save login state
-              app.login(userInfo);
-              resolve();
-            }).catch(err => {
-              console.error('Quick auth failed:', err);
-              // Fallback to mock login in case of auth failure
-              this.mockLogin().then(() => {
-                resolve();
-              }).catch(mockErr => {
-                reject(mockErr);
-              });
+            // Try to get user profile info (optional)
+            wx.getUserProfile({
+              desc: '用于完善个人资料',
+              success: (profileRes) => {
+                this.performLogin(loginRes.code, profileRes.userInfo, resolve, reject);
+              },
+              fail: () => {
+                // If getUserProfile fails, login without user info
+                this.performLogin(loginRes.code, null, resolve, reject);
+              }
             });
           } else {
+            console.error('wx.login failed: no code received');
             reject(new Error('Failed to get WeChat code'));
           }
         },
         fail: (err) => {
-          // Fallback to mock login
-          this.mockLogin().then(() => {
-            resolve();
-          }).catch(mockErr => {
-            reject(mockErr);
-          });
+          console.error('wx.login API failed:', err);
+          reject(new Error('WeChat login API failed: ' + (err.errMsg || 'unknown')));
         }
       });
     });
   },
 
   /**
-   * Mock login for development environment
+   * Development login - create mock session without WeChat API
    */
   mockLogin: function() {
-    return new Promise((resolve) => {
-      console.log('Using mock login for development');
+    return new Promise((resolve, reject) => {
+      console.log('Development mode: creating mock authentication session');
       
-      // Create mock user info
-      const mockUserInfo = {
+      // Create mock user session directly
+      const mockUser = {
         id: 'dev_user_' + Date.now(),
-        nickname: 'Developer',
+        nickname: 'Dev User',
         avatar_url: '/images/default_avatar.png',
-        created_at: new Date().toISOString()
+        is_new_user: false
       };
       
       // Create mock token
-      const mockToken = 'dev_token_' + Date.now();
+      const mockToken = 'dev_token_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+      
+      // Save mock token
       storage.setToken(mockToken);
       
-      // Set logged in state
-      app.login(mockUserInfo);
+      // Save login state
+      app.login(mockUser);
       
-      console.log('Mock login completed');
+      console.log('Development authentication completed with mock session');
       resolve();
     });
   },
@@ -333,32 +365,31 @@ Page({
 
     this.scrollToBottom();
 
-    const isDev = this.isDevelopment();
-    console.log('Environment check - isDevelopment:', isDev);
+    // Send message using dict AI chat endpoint (no authentication required)
+    console.log('Sending chat message via dict AI endpoint...');
     
-    if (isDev) {
-      // In development environment, skip auth and call API directly
-      console.log('Development mode: calling real API without auth');
-      api.sendChatMessage(text, this.data.settings.includeHistory, { skipAuth: true }).then(result => {
-        this.handleApiResponse(result);
-      }).catch(err => {
-        console.error('Development API call failed:', err);
-        // Fallback to mock response if API fails
-        this.getMockResponse(text).then(mockResult => {
-          this.handleApiResponse(mockResult);
-        });
-      });
-      return;
-    }
-    
-    // Production environment: ensure authentication first
-    this.ensureAuth().then(() => {
-      console.log('Production mode: sending authenticated request');
-      return api.sendChatMessage(text, this.data.settings.includeHistory);
-    }).then(result => {
-      this.handleApiResponse(result);
-    }).catch(err => {
-      this.handleApiError(err);
+    // Use the dict AI chat endpoint that works like /dict/query
+    wx.request({
+      url: 'https://api.jimingge.net/api/v1/dict/ai-chat',
+      method: 'POST',
+      header: {
+        'Content-Type': 'application/json'
+      },
+      data: {
+        message: text
+      },
+      success: (res) => {
+        console.log('Dict AI chat response:', res.statusCode, res.data);
+        if (res.statusCode === 200) {
+          this.handleApiResponse(res.data);
+        } else {
+          this.handleApiError(new Error(res.data?.detail || 'Request failed'));
+        }
+      },
+      fail: (err) => {
+        console.error('Dict AI chat failed:', err);
+        this.handleApiError(new Error('Network request failed'));
+      }
     });
   },
 
@@ -397,11 +428,22 @@ Page({
       isLoading: false
     });
 
+    let errorContent = 'Sorry, I encountered an error. Please try again.';
+    
+    // Provide specific error messages
+    if (err.message.includes('Not authenticated')) {
+      errorContent = 'Authentication failed. Please check your network connection and try again.';
+    } else if (err.message.includes('Network request failed')) {
+      errorContent = 'Network error. Please check your internet connection.';
+    } else if (err.message.includes('timeout')) {
+      errorContent = 'Request timeout. Please try again.';
+    }
+
     // Show error message
     const errorMessage = {
       id: Date.now() + 1,
       type: 'ai',
-      content: 'Sorry, I encountered an error. Please try again.',
+      content: errorContent,
       time: this.formatTime(new Date()),
       isError: true
     };
