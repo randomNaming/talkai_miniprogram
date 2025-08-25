@@ -6,12 +6,14 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from loguru import logger
 
 from app.core.database import get_db
 from app.api.v1.auth import get_current_user
 from app.models.vocab import VocabItem
 from app.services.dictionary import dictionary_service
+from app.services.vocabulary import vocabulary_service
 
 router = APIRouter()
 
@@ -527,7 +529,7 @@ async def get_vocabulary_stats(
             level_counts[level] = count
         
         # Average mastery score
-        avg_mastery = db.query(db.func.avg(VocabItem.mastery_score)).filter(
+        avg_mastery = db.query(func.avg(VocabItem.mastery_score)).filter(
             VocabItem.user_id == user_id,
             VocabItem.is_active == True
         ).scalar() or 0.0
@@ -546,4 +548,291 @@ async def get_vocabulary_stats(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get vocabulary statistics"
+        )
+
+
+@router.post("/load-level")
+async def load_vocabulary_by_level(
+    level_request: dict,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Load vocabulary words based on user's learning level
+    
+    This mimics the talkai_py vocab_loader functionality that automatically
+    loads appropriate vocabulary based on the user's grade/level.
+    """
+    try:
+        user_id = current_user["sub"]
+        level = level_request.get("level", "").strip()
+        
+        if not level:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Level is required"
+            )
+        
+        # Get user to check if level already loaded
+        from app.models.user import User
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        # Check if vocabulary for this level has already been loaded
+        added_vocab_levels = user.added_vocab_levels or []
+        if level in added_vocab_levels:
+            return {
+                "message": f"Vocabulary for {level} level has already been loaded",
+                "level": level,
+                "already_loaded": True,
+                "words_added": 0
+            }
+        
+        # Define level to word mappings (simulated from talkai_py)
+        level_words = {
+            "Primary School": [
+                "apple", "book", "cat", "dog", "eat", "fish", "good", "house", 
+                "like", "water", "school", "friend", "family", "happy", "play"
+            ],
+            "Middle School": [
+                "achieve", "adventure", "beautiful", "computer", "different", "education",
+                "environment", "friendship", "important", "knowledge", "library", "music",
+                "nature", "opportunity", "question", "science", "technology", "understand"
+            ],
+            "High School": [
+                "accomplish", "analyze", "comprehensive", "demonstrate", "efficient",
+                "fundamental", "generation", "hypothesis", "implement", "justify",
+                "knowledge", "literature", "mathematics", "necessary", "organization"
+            ],
+            "CET4": [
+                "abandon", "accurate", "adequate", "alternative", "assumption", "attribute",
+                "benefit", "category", "concept", "considerable", "consistent", "contribute",
+                "definitely", "efficient", "equivalent", "evaluation", "fundamental", "hypothesis"
+            ],
+            "CET6": [
+                "abundant", "accommodate", "acknowledge", "aesthetic", "apparatus", "articulate",
+                "autonomous", "coherent", "compatible", "contemplate", "controversy", "criterion",
+                "demonstrate", "elaborate", "explicit", "hierarchy", "inevitable", "preliminary"
+            ],
+            "TOEFL": [
+                "comprehensive", "demonstrate", "distribute", "establish", "evidence", "factor",
+                "identify", "interpret", "method", "obtain", "occur", "percent", "period",
+                "policy", "principle", "procedure", "process", "require", "research", "structure"
+            ],
+            "IELTS": [
+                "analyze", "approach", "area", "assessment", "concept", "consistent", "constitute",
+                "context", "contract", "create", "data", "derive", "distribution", "economic",
+                "environment", "estimate", "function", "indicate", "interpret", "source"
+            ],
+            "GRE": [
+                "aberration", "abscond", "abstemious", "admonish", "aesthetic", "altruistic",
+                "amalgamate", "ambiguous", "anomaly", "antipathy", "apathy", "appease",
+                "arbitrary", "arduous", "articulate", "ascetic", "audacious", "austere"
+            ]
+        }
+        
+        words_to_add = level_words.get(level, [])
+        if not words_to_add:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported level: {level}"
+            )
+        
+        # Add words to user's vocabulary
+        added_count = 0
+        updated_count = 0
+        
+        for word in words_to_add:
+            # Check if word already exists
+            existing = db.query(VocabItem).filter(
+                VocabItem.user_id == user_id,
+                VocabItem.word == word.lower(),
+                VocabItem.is_active == True
+            ).first()
+            
+            if existing:
+                # Update existing word with level information
+                existing.level = level
+                existing.source = "level_vocab"
+                existing.updated_at = datetime.utcnow()
+                updated_count += 1
+            else:
+                # Auto-lookup word details
+                word_info = dictionary_service.query_word(word.lower())
+                definition = ""
+                phonetic = ""
+                translation = ""
+                
+                if word_info:
+                    definition = word_info.get("definition", "")
+                    phonetic = word_info.get("phonetic", "")
+                    translation = word_info.get("translation", "")
+                
+                # Create new vocabulary item
+                vocab_item = VocabItem(
+                    user_id=user_id,
+                    word=word.lower(),
+                    definition=definition,
+                    phonetic=phonetic,
+                    translation=translation,
+                    source="level_vocab",
+                    level=level,
+                    familiarity=0.0,
+                    encounter_count=0,
+                    correct_count=0,
+                    mastery_score=0.0,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
+                    is_active=True,
+                    is_mastered=False
+                )
+                
+                db.add(vocab_item)
+                added_count += 1
+        
+        # Update user's added_vocab_levels
+        if level not in added_vocab_levels:
+            added_vocab_levels.append(level)
+            user.added_vocab_levels = added_vocab_levels
+        
+        db.commit()
+        
+        return {
+            "message": f"Successfully loaded vocabulary for {level} level",
+            "level": level,
+            "words_added": added_count,
+            "words_updated": updated_count,
+            "total_words": len(words_to_add),
+            "already_loaded": False
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Load vocabulary by level failed: {e}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to load vocabulary by level"
+        )
+
+
+@router.post("/update-usage")
+async def update_word_usage(
+    usage_request: dict,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update word usage statistics and check for mastery
+    
+    This mimics the talkai_py vocabulary manager's mastery detection
+    where mastery is achieved when right_use_count - wrong_use_count >= 3
+    """
+    try:
+        user_id = current_user["sub"]
+        word = usage_request.get("word", "").strip().lower()
+        usage_type = usage_request.get("usage_type", "").strip()  # "right_use" or "wrong_use"
+        
+        if not word or not usage_type:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Word and usage_type are required"
+            )
+        
+        if usage_type not in ["right_use", "wrong_use"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="usage_type must be 'right_use' or 'wrong_use'"
+            )
+        
+        # Find the vocabulary item
+        vocab_item = db.query(VocabItem).filter(
+            VocabItem.user_id == user_id,
+            VocabItem.word == word,
+            VocabItem.is_active == True
+        ).first()
+        
+        if not vocab_item:
+            # If word doesn't exist, create it with initial usage
+            word_info = dictionary_service.query_word(word)
+            definition = ""
+            phonetic = ""
+            translation = ""
+            
+            if word_info:
+                definition = word_info.get("definition", "")
+                phonetic = word_info.get("phonetic", "")
+                translation = word_info.get("translation", "")
+            
+            vocab_item = VocabItem(
+                user_id=user_id,
+                word=word,
+                definition=definition,
+                phonetic=phonetic,
+                translation=translation,
+                source="wrong_use" if usage_type == "wrong_use" else "right_use",
+                level="",
+                familiarity=0.0,
+                encounter_count=1,
+                correct_count=1 if usage_type == "right_use" else 0,
+                mastery_score=0.0,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+                is_active=True,
+                is_mastered=False
+            )
+            
+            db.add(vocab_item)
+        else:
+            # Update existing vocabulary item
+            vocab_item.encounter_count = (vocab_item.encounter_count or 0) + 1
+            
+            if usage_type == "right_use":
+                vocab_item.correct_count = (vocab_item.correct_count or 0) + 1
+            
+            vocab_item.updated_at = datetime.utcnow()
+        
+        # Calculate wrong_use_count (encounter_count - correct_count)
+        right_use_count = vocab_item.correct_count or 0
+        wrong_use_count = (vocab_item.encounter_count or 0) - right_use_count
+        
+        # Check for mastery (talkai_py logic: right_use_count - wrong_use_count >= 3)
+        mastery_threshold = right_use_count - wrong_use_count
+        is_mastered = mastery_threshold >= 3
+        
+        if is_mastered and not vocab_item.is_mastered:
+            vocab_item.is_mastered = True
+            vocab_item.mastery_score = 1.0
+        elif not is_mastered:
+            vocab_item.is_mastered = False
+            # Calculate mastery score as a percentage
+            vocab_item.mastery_score = max(0.0, min(1.0, mastery_threshold / 3.0))
+        
+        db.commit()
+        db.refresh(vocab_item)
+        
+        return {
+            "word": vocab_item.word,
+            "right_use_count": right_use_count,
+            "wrong_use_count": wrong_use_count,
+            "encounter_count": vocab_item.encounter_count,
+            "mastery_score": vocab_item.mastery_score,
+            "is_mastered": vocab_item.is_mastered,
+            "mastery_threshold": mastery_threshold,
+            "message": "Congratulations! You've mastered this word!" if (is_mastered and not vocab_item.is_mastered) else "Usage updated successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Update word usage failed: {e}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update word usage"
         )

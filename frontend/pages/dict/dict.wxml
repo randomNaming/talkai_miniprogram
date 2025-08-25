@@ -1,5 +1,6 @@
 <!--pages/dict/dict.wxml-->
 <view class="dict-container">
+  <!-- Search Header -->
   <view class="search-header">
     <view class="search-box">
       <input 
@@ -11,36 +12,74 @@
         confirm-type="search"
       />
       <button class="search-btn" bindtap="onSearch" disabled="{{isSearching}}">
-        <text wx:if="{{!isSearching}}">🔍</text>
-        <text wx:else>⏳</text>
+        <text wx:if="{{!isSearching}}">搜索</text>
+        <text wx:else>搜索中</text>
       </button>
     </view>
   </view>
 
-  <scroll-view class="dict-content" scroll-y="true">
-    <view class="search-results" wx:if="{{searchResults.length > 0}}">
+  <!-- Recent Searches -->
+  <view class="recent-section" wx:if="{{recentSearches.length > 0 && searchResults.length === 0}}">
+    <view class="recent-header">
+      <text class="recent-title">最近搜索</text>
+      <button class="clear-btn" bindtap="onClearRecentSearches">清空</button>
+    </view>
+    <view class="recent-list">
+      <button 
+        class="recent-item" 
+        wx:for="{{recentSearches}}" 
+        wx:key="*this"
+        bindtap="onRecentSearchTap"
+        data-word="{{item}}"
+      >
+        {{item}}
+      </button>
+    </view>
+  </view>
+
+  <!-- Results Section -->
+  <view class="results-section" wx:if="{{searchResults.length > 0}}">
+    <view class="results-header">
+      <text class="results-title">搜索结果</text>
+    </view>
+    <scroll-view class="results-content" scroll-y="true">
       <view class="result-item" wx:for="{{searchResults}}" wx:key="word">
         <view class="word-header">
-          <text class="word-text">{{item.word}}</text>
-          <text class="word-phonetic" wx:if="{{item.phonetic}}">{{item.phonetic}}</text>
+          <view class="word-main">
+            <text class="word-text">{{item.word}}</text>
+            <text class="word-phonetic" wx:if="{{item.phonetic}}">{{item.phonetic}}</text>
+          </view>
+          <view class="word-actions">
+            <button class="action-btn" bindtap="onAddToVocab" data-word="{{item.word}}">
+              <text>➕</text>
+            </button>
+          </view>
         </view>
-        <text class="word-definition">{{item.definition || item.translation}}</text>
+        <text class="word-definition">{{item.definition}}</text>
+        <view class="word-translation" wx:if="{{item.translation}}">
+          <text>{{item.translation}}</text>
+        </view>
       </view>
-    </view>
+    </scroll-view>
+  </view>
 
-    <view class="recent-searches" wx:if="{{recentSearches.length > 0 && searchResults.length === 0}}">
-      <text class="section-title">最近搜索</text>
-      <view class="recent-list">
-        <button 
-          class="recent-item" 
-          wx:for="{{recentSearches}}" 
-          wx:key="*this"
-          bindtap="onRecentTap"
-          data-word="{{item}}"
-        >
-          {{item}}
-        </button>
-      </view>
-    </view>
-  </scroll-view>
+  <!-- Loading State -->
+  <view class="loading-container" wx:if="{{isSearching}}">
+    <loading></loading>
+    <text class="loading-text">搜索中...</text>
+  </view>
+
+  <!-- Empty State -->
+  <view class="empty-container" wx:if="{{!isSearching && searchResults.length === 0 && searchText.length > 0}}">
+    <text class="empty-icon">🔍</text>
+    <text class="empty-title">未找到相关结果</text>
+    <text class="empty-desc">尝试输入其他关键词或检查拼写</text>
+  </view>
+
+  <!-- Initial State -->
+  <view class="empty-container" wx:if="{{!isSearching && searchResults.length === 0 && searchText.length === 0 && recentSearches.length === 0}}">
+    <text class="empty-icon">📖</text>
+    <text class="empty-title">英英词典</text>
+    <text class="empty-desc">输入英文或中文开始查词</text>
+  </view>
 </view>

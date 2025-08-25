@@ -6,10 +6,16 @@
 function getEnvironment() {
   // Check if running in WeChat Developer Tools
   const systemInfo = wx.getSystemInfoSync();
-  const isDevelopment = systemInfo.platform === 'devtools' || 
+  const isSimulator = systemInfo.platform === 'devtools';
+  const isDevelopment = isSimulator || 
                        systemInfo.environment === 'dev' ||
-                       wx.canIUse('getAccountInfoSync') && 
-                       wx.getAccountInfoSync().miniProgram.envVersion === 'develop';
+                       (wx.canIUse('getAccountInfoSync') && 
+                        wx.getAccountInfoSync().miniProgram.envVersion === 'develop');
+  
+  // If it's development but not simulator, it's real device debugging
+  if (isDevelopment && !isSimulator) {
+    return 'device-debug';
+  }
   
   return isDevelopment ? 'development' : 'production';
 }
@@ -20,6 +26,12 @@ const ENV_CONFIG = {
     API_BASE_URL: 'http://localhost:8000/api/v1',
     DEBUG: true,
     USE_MOCK: false, // Set to true to use mock responses in development
+    LOG_LEVEL: 'debug'
+  },
+  'device-debug': {
+    API_BASE_URL: 'http://192.168.1.100:8000/api/v1', // Use local network IP for real device debugging
+    DEBUG: true,
+    USE_MOCK: false,
     LOG_LEVEL: 'debug'
   },
   production: {

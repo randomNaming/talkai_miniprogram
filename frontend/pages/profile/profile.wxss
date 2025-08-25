@@ -1,0 +1,230 @@
+/* pages/profile/profile.wxss */
+
+.profile-container {
+  height: 100vh;
+  background: #F5F7FA;
+}
+
+/* Header */
+.profile-header {
+  background: linear-gradient(135deg, #2C5AA0 0%, #4A7BC8 100%);
+  padding: 60rpx 30rpx 40rpx 30rpx;
+  color: white;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  margin-bottom: 32rpx;
+}
+
+.user-avatar {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 50%;
+  border: 4rpx solid rgba(255, 255, 255, 0.3);
+  margin-right: 32rpx;
+}
+
+.user-details {
+  flex: 1;
+}
+
+.user-name {
+  font-size: 32rpx;
+  font-weight: 600;
+  margin-bottom: 8rpx;
+}
+
+.user-level {
+  font-size: 24rpx;
+  opacity: 0.8;
+}
+
+.stats-row {
+  display: flex;
+  justify-content: space-around;
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-number {
+  font-size: 36rpx;
+  font-weight: 600;
+  display: block;
+}
+
+.stat-label {
+  font-size: 22rpx;
+  opacity: 0.8;
+  margin-top: 4rpx;
+}
+
+/* Menu Section */
+.menu-section {
+  background: white;
+  margin: 20rpx 0;
+  border-radius: 16rpx;
+  overflow: hidden;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  padding: 32rpx 30rpx;
+  border-bottom: 2rpx solid #F1F3F4;
+  background: white;
+  transition: background 0.2s ease;
+}
+
+.menu-item:last-child {
+  border-bottom: none;
+}
+
+.menu-item:active {
+  background: #F8F9FA;
+}
+
+.menu-item::after {
+  border: none;
+}
+
+.menu-icon {
+  width: 48rpx;
+  height: 48rpx;
+  background: rgba(44, 90, 160, 0.1);
+  border-radius: 12rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  color: #2C5AA0;
+  margin-right: 24rpx;
+}
+
+.menu-content {
+  flex: 1;
+}
+
+.menu-title {
+  font-size: 28rpx;
+  color: #333;
+  font-weight: 500;
+}
+
+.menu-desc {
+  font-size: 22rpx;
+  color: #666;
+  margin-top: 4rpx;
+}
+
+.menu-arrow {
+  font-size: 20rpx;
+  color: #999;
+}
+
+/* Learning Progress */
+.progress-section {
+  background: white;
+  margin: 20rpx 0;
+  border-radius: 16rpx;
+  padding: 32rpx 30rpx;
+}
+
+.progress-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 24rpx;
+}
+
+.progress-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24rpx;
+}
+
+.progress-item:last-child {
+  margin-bottom: 0;
+}
+
+.progress-label {
+  font-size: 24rpx;
+  color: #666;
+}
+
+.progress-value {
+  font-size: 24rpx;
+  color: #2C5AA0;
+  font-weight: 600;
+}
+
+.progress-bar {
+  height: 8rpx;
+  background: #F1F3F4;
+  border-radius: 4rpx;
+  margin-top: 12rpx;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2C5AA0 0%, #4A7BC8 100%);
+  border-radius: 4rpx;
+  transition: width 0.3s ease;
+}
+
+/* Settings Section */
+.settings-section {
+  background: white;
+  margin: 20rpx 0;
+  border-radius: 16rpx;
+  overflow: hidden;
+}
+
+.setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 32rpx 30rpx;
+  border-bottom: 2rpx solid #F1F3F4;
+}
+
+.setting-item:last-child {
+  border-bottom: none;
+}
+
+.setting-label {
+  font-size: 28rpx;
+  color: #333;
+}
+
+.setting-switch {
+  transform: scale(0.8);
+}
+
+/* Version Info */
+.version-info {
+  text-align: center;
+  padding: 40rpx 30rpx;
+  color: #999;
+  font-size: 22rpx;
+}
+
+/* Loading State */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 400rpx;
+}
+
+.loading-text {
+  font-size: 24rpx;
+  color: #666;
+  margin-top: 16rpx;
+}

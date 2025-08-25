@@ -2,10 +2,9 @@
 
 ## 本地开发
 请激活虚拟开发环境
-source /Users/pean/aiproject/talkai_py/bookvidenv   
-cd /Users/pean/aiproject/talkai_mini/backend
+  source /Users/pean/aiproject/talkai_mini/talkai_py/bookvidenv_new/bin/activate
+  cd /Users/pean/aiproject/talkai_mini/backend
   uvicorn main:app --reload --host 0.0.0.0 --port 8000
-
 
 ## 线上部署：用 Docker 
 

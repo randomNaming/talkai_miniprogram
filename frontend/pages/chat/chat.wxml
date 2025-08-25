@@ -44,13 +44,14 @@
 
       <!-- Chat Messages -->
       <view 
-        class="message-item {{item.type === 'user' ? 'user-message' : 'ai-message'}}"
+        class="message-item {{item.type === 'user' ? 'user-message' : (item.type === 'system' ? 'system-message' : 'ai-message')}}"
         wx:for="{{messages}}" 
         wx:key="id"
         id="msg-{{item.id}}"
       >
-        <view class="message-avatar" wx:if="{{item.type === 'ai'}}">
-          <text class="avatar-icon">🤖</text>
+        <view class="message-avatar" wx:if="{{item.type === 'ai' || item.type === 'system'}}">
+          <text class="avatar-icon" wx:if="{{item.type === 'ai'}}">🤖</text>
+          <text class="avatar-icon" wx:if="{{item.type === 'system'}}">📊</text>
         </view>
         
         <view class="message-content">
@@ -60,11 +61,17 @@
             <!-- Grammar Correction -->
             <view class="grammar-correction" wx:if="{{item.grammar_check && item.grammar_check.has_error}}">
               <view class="correction-header">
-                <text class="correction-icon">✏️</text>
+                <text class="correction-icon">{{item.confidence_indicator || '✓'}}</text>
                 <text class="correction-title">语法纠正</text>
+                <text class="confidence-level" wx:if="{{item.confidence_level}}">({{item.confidence_level}})</text>
               </view>
               <view class="correction-content">
-                <text class="corrected-text">{{item.grammar_check.corrected_input}}</text>
+                <rich-text class="corrected-text-rich" nodes="{{item.highlighted_correction}}"></rich-text>
+              </view>
+              <!-- Explanation if available -->
+              <view class="correction-explanation" wx:if="{{item.correction_explanation}}">
+                <text class="explanation-icon">💡</text>
+                <text class="explanation-text">{{item.correction_explanation}}</text>
               </view>
               <!-- Vocabulary to learn -->
               <view class="vocab-to-learn" wx:if="{{item.grammar_check.vocab_to_learn.length > 0}}">
@@ -80,7 +87,7 @@
                   >
                     <text class="vocab-original">{{vocab.original}}</text>
                     <text class="vocab-arrow">→</text>
-                    <text class="vocab-corrected">{{vocab.corrected}}</text>
+                    <text class="vocab-corrected error-type-{{vocab.error_type || 'vocabulary'}}">{{vocab.corrected}}</text>
                     <text class="vocab-add-btn">+</text>
                   </view>
                 </view>
@@ -89,6 +96,23 @@
           </view>
           
           <view class="message-time">{{item.time}}</view>
+          
+          <!-- Vocabulary Suggestions -->
+          <view class="vocab-suggestions" wx:if="{{item.suggested_vocab && item.suggested_vocab.length > 0}}">
+            <view class="suggestion-header">
+              <text class="suggestion-icon">📚</text>
+              <text class="suggestion-title">推荐词汇练习：</text>
+            </view>
+            <view class="suggestion-words">
+              <text 
+                class="suggested-word"
+                wx:for="{{item.suggested_vocab}}"
+                wx:key="*this"
+                bindtap="onVocabSuggestionTap"
+                data-word="{{item}}"
+              >{{item}}</text>
+            </view>
+          </view>
           
           <!-- Message Actions -->
           <view class="message-actions" wx:if="{{item.type === 'ai'}}">

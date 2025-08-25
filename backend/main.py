@@ -21,6 +21,7 @@ from app.api.v1.auth import router as auth_router
 from app.api.v1.dict import router as dict_router
 from app.api.v1.chat import router as chat_router
 from app.api.v1.vocab import router as vocab_router
+from app.api.v1.learning_vocab import router as learning_vocab_router
 from app.api.v1.user import router as user_router
 from app.api.v1.sync import router as sync_router
 
@@ -121,6 +122,7 @@ app.include_router(auth_router, prefix=f"{api_prefix}/auth", tags=["authenticati
 app.include_router(dict_router, prefix=f"{api_prefix}/dict", tags=["dictionary"])
 app.include_router(chat_router, prefix=f"{api_prefix}/chat", tags=["chat"])
 app.include_router(vocab_router, prefix=f"{api_prefix}/vocab", tags=["vocabulary"])
+app.include_router(learning_vocab_router, prefix=f"{api_prefix}/learning-vocab", tags=["learning-vocabulary"])
 app.include_router(user_router, prefix=f"{api_prefix}/user", tags=["user"])
 app.include_router(sync_router, prefix=f"{api_prefix}/sync", tags=["synchronization"])
 

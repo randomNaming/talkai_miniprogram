@@ -61,11 +61,18 @@ async def send_message(
     """
     Send a message and get AI response with grammar correction
     
-    This endpoint:
-    1. Checks grammar and identifies vocabulary to learn
-    2. Generates an AI response for conversation practice
-    3. Records the interaction for learning analysis
+    Following talkai_py pattern:
+    1. FIRST: Generate AI dialogue response using conversation memory (fast response to UI)
+    2. SECOND: Check grammar/correction in parallel (separate AI call, different prompt)
+    3. THIRD: Generate vocabulary suggestions based on conversation context
+    
+    Key differences from previous implementation:
+    - AI dialogue and grammar correction are separate AI model calls
+    - Only natural conversation is saved in memory (not corrections)
+    - Faster response by immediately returning dialogue, processing corrections async
     """
+    import asyncio
+    
     try:
         user_id = current_user["sub"]
         user_input = chat_request.message.strip()
@@ -85,66 +92,81 @@ async def send_message(
             )
         
         user_profile = {
+            "user_id": user_id,
             "age": user.age,
             "gender": user.gender,
             "grade": user.grade,
             "preferred_ai_model": user.preferred_ai_model
         }
         
-        # Check grammar and identify vocabulary
-        grammar_result = await ai_service.check_grammar_and_vocabulary(user_input)
-        
-        # Get conversation history if requested
-        conversation_history = []
-        if chat_request.include_history:
-            recent_records = (
-                db.query(ChatRecord)
-                .filter(ChatRecord.user_id == user_id)
-                .order_by(ChatRecord.created_at.desc())
-                .limit(settings.max_memory_turns * 2)  # Get recent conversation turns
-                .all()
-            )
-            
-            # Convert to conversation format (reverse to chronological order)
-            for record in reversed(recent_records):
-                conversation_history.append({
-                    "role": "user",
-                    "content": record.user_input
-                })
-                # Note: We don't include AI responses in history to avoid confusion
-                # The AI will generate appropriate responses based on user inputs
-        
-        # Generate AI response
-        ai_response = await ai_service.generate_chat_response(
+        # STEP 1: IMMEDIATE AI DIALOGUE RESPONSE (using conversation memory)
+        # This uses LangChain ConversationBufferWindowMemory and saves to memory
+        logger.info(f"Step 1: Generating natural dialogue response for user {user_id}")
+        response_result = ai_service.generate_response_natural(
             user_input=user_input,
             user_profile=user_profile,
-            conversation_history=conversation_history
+            user_id=user_id  # This will use user-specific memory
+        )
+        ai_response = response_result.get("text", "")
+        
+        # STEP 2 & 3: PARALLEL PROCESSING (grammar check + vocabulary suggestions)
+        # These run separately and don't affect conversation memory
+        logger.info(f"Step 2&3: Starting parallel grammar check and vocabulary suggestions")
+        
+        async def grammar_check_task():
+            """Separate grammar check task - does NOT affect conversation memory"""
+            return ai_service.check_vocab_from_input(user_input)  # Different AI call, different prompt
+        
+        async def vocab_suggestion_task():
+            """Vocabulary suggestion task based on conversation context"""
+            return await ai_service.suggest_vocabulary(
+                user_id=user_id,
+                user_input=user_input,
+                ai_response=ai_response,
+                db=db
+            )
+        
+        # Run grammar check and vocabulary suggestions in parallel
+        grammar_result, suggested_vocab = await asyncio.gather(
+            grammar_check_task(),
+            vocab_suggestion_task(),
+            return_exceptions=True
         )
         
-        # Save chat record for learning analysis
+        # Handle potential exceptions from parallel tasks
+        if isinstance(grammar_result, Exception):
+            logger.error(f"Grammar check failed: {grammar_result}")
+            grammar_result = {"corrected_input": None, "words_deserve_to_learn": []}
+        
+        if isinstance(suggested_vocab, Exception):
+            logger.error(f"Vocabulary suggestion failed: {suggested_vocab}")
+            suggested_vocab = []
+        
+        # STEP 4: SAVE CHAT RECORD (only natural conversation, not corrections)
         chat_record = ChatRecord(
             user_id=user_id,
             user_input=user_input,
             ai_correction=grammar_result.get("corrected_input") if grammar_result.get("has_error") else None,
             correction_type="grammar" if grammar_result.get("has_error") else None,
             grammar_errors=grammar_result.get("vocab_to_learn", []),
-            difficulty_score=0.5,  # TODO: Calculate based on complexity
-            conversation_context="general",  # TODO: Detect topic
+            difficulty_score=0.5,
+            conversation_context="general",
             is_processed=False
         )
         
         db.add(chat_record)
-        
-        # Update user chat count
         user.chat_history_count = (user.chat_history_count or 0) + 1
-        
         db.commit()
         
-        # Prepare response
+        # STEP 5: PREPARE RESPONSE FORMAT
         grammar_check = None
-        if grammar_result.get("has_error"):
+        corrected_input = grammar_result.get("corrected_input")
+        words_deserve_to_learn = grammar_result.get("words_deserve_to_learn", [])
+        
+        # Only show correction if corrected_input exists AND is different from user input
+        if corrected_input and corrected_input != user_input:
             vocab_items = []
-            for item in grammar_result.get("vocab_to_learn", []):
+            for item in words_deserve_to_learn:
                 vocab_items.append(VocabItem(
                     original=item.get("original", ""),
                     corrected=item.get("corrected", ""),
@@ -152,15 +174,29 @@ async def send_message(
                 ))
             
             grammar_check = GrammarCheckResult(
-                corrected_input=grammar_result.get("corrected_input", user_input),
-                has_error=grammar_result.get("has_error", False),
+                corrected_input=corrected_input,
+                has_error=True,
                 vocab_to_learn=vocab_items
             )
+        
+        # STEP 6: ASYNCHRONOUS VOCABULARY DATABASE UPDATE (background task)
+        if grammar_result.get("corrected_input") is not None:
+            # Run in background - don't wait for this
+            asyncio.create_task(
+                ai_service.update_vocabulary_from_correction(
+                    grammar_result=grammar_result,
+                    user_input=user_input,
+                    user_id=user_id,
+                    db=db
+                )
+            )
+        
+        logger.info(f"Chat response completed for user {user_id}: dialogue={len(ai_response)} chars, corrections={len(words_deserve_to_learn)}, vocab_suggestions={len(suggested_vocab or [])}")
         
         return ChatResponse(
             response=ai_response,
             grammar_check=grammar_check,
-            suggested_vocab=[]  # TODO: Implement vocabulary suggestions
+            suggested_vocab=suggested_vocab or []
         )
         
     except HTTPException:
@@ -286,3 +322,71 @@ async def get_initial_greeting():
         "message": ai_service.get_initial_greeting(),
         "timestamp": datetime.utcnow().isoformat()
     }
+
+
+@router.post("/auto-message")
+async def generate_auto_message(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Generate automatic conversation starter when user is inactive
+    
+    This mimics the auto-message feature from talkai_py where the AI
+    proactively suggests new conversation topics.
+    """
+    try:
+        user_id = current_user["sub"]
+        
+        # Get user profile
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        user_profile = {
+            "user_id": user_id,  # Add user_id for vocabulary suggestions
+            "age": user.age,
+            "gender": user.gender,
+            "grade": user.grade,
+            "preferred_ai_model": user.preferred_ai_model
+        }
+        
+        # Get recent conversation context
+        recent_records = (
+            db.query(ChatRecord)
+            .filter(ChatRecord.user_id == user_id)
+            .order_by(ChatRecord.created_at.desc())
+            .limit(5)  # Last few messages for context
+            .all()
+        )
+        
+        conversation_context = []
+        for record in reversed(recent_records):
+            conversation_context.append({
+                "role": "user", 
+                "content": record.user_input
+            })
+        
+        # Generate auto message based on user profile and recent context
+        auto_message = await ai_service.generate_auto_message(
+            user_profile=user_profile,
+            conversation_history=conversation_context
+        )
+        
+        return {
+            "message": auto_message,
+            "timestamp": datetime.utcnow().isoformat(),
+            "is_auto_generated": True
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Auto message generation failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate auto message"
+        )

@@ -366,15 +366,44 @@ Page({
 
     this.scrollToBottom();
 
-    // Send message using dict AI chat endpoint (no authentication required)
-    console.log('Sending chat message via dict AI endpoint...');
+    // Use proper authenticated chat API
+    this.sendAuthenticatedMessage(text);
+  },
+
+  /**
+   * Send message using authenticated chat API
+   */
+  sendAuthenticatedMessage: function(text) {
+    console.log('Sending authenticated chat message...');
     
-    // Get current environment config for API URL
+    // Ensure authentication first
+    this.ensureAuth().then(() => {
+      // Send message using proper chat API
+      const requestData = {
+        message: text,
+        include_history: this.data.settings.includeHistory
+      };
+      
+      return api.chat.sendMessage(requestData);
+    }).then(result => {
+      console.log('Chat API response:', result);
+      this.handleApiResponse(result);
+    }).catch(err => {
+      console.error('Chat API failed:', err);
+      
+      // Fallback to dict AI endpoint for development/testing
+      console.log('Falling back to dict AI endpoint...');
+      this.sendFallbackMessage(text);
+    });
+  },
+
+  /**
+   * Fallback method using dict AI endpoint (for development/testing)
+   */
+  sendFallbackMessage: function(text) {
     const config = envConfig.getConfig();
     const apiUrl = `${config.API_BASE_URL}/dict/ai-chat`;
-    console.log('Using API URL:', apiUrl);
     
-    // Use the dict AI chat endpoint that works like /dict/query
     wx.request({
       url: apiUrl,
       method: 'POST',
@@ -385,7 +414,7 @@ Page({
         message: text
       },
       success: (res) => {
-        console.log('Dict AI chat response:', res.statusCode, res.data);
+        console.log('Fallback dict AI response:', res.statusCode, res.data);
         if (res.statusCode === 200) {
           this.handleApiResponse(res.data);
         } else {
@@ -393,7 +422,7 @@ Page({
         }
       },
       fail: (err) => {
-        console.error('Dict AI chat failed:', err);
+        console.error('Fallback request failed:', err);
         this.handleApiError(new Error('Network request failed'));
       }
     });
@@ -414,11 +443,22 @@ Page({
       grammar_check: result.grammar_check,
       suggested_vocab: result.suggested_vocab || []
     };
+    
+    // Process grammar correction with UI enhancements (based on talkai_py ui.py)
+    // Note: Backend returns 'has_error' field in grammar_check
+    if (result.grammar_check && result.grammar_check.has_error) {
+      this.enhanceGrammarCorrection(aiMessage);
+    }
 
     this.setData({
       messages: [...this.data.messages, aiMessage],
       isLoading: false
     });
+    
+    // Add vocabulary suggestions as system message (like talkai_py)
+    if (result.suggested_vocab && result.suggested_vocab.length > 0) {
+      this.addVocabSuggestionMessage(result.suggested_vocab);
+    }
 
     this.scrollToBottom();
     this.saveCachedMessages();
@@ -618,6 +658,154 @@ Page({
     }
   },
 
+  /**
+   * Enhance grammar correction with UI patterns from talkai_py
+   */
+  enhanceGrammarCorrection: function(message) {
+    const grammarCheck = message.grammar_check;
+    if (!grammarCheck || !grammarCheck.has_error) return;
+    
+    // Calculate confidence level (based on talkai_py logic)
+    const confidenceLevel = this.calculateCorrectionConfidence(grammarCheck.vocab_to_learn);
+    message.confidence_level = confidenceLevel;
+    message.confidence_indicator = this.getConfidenceIndicator(confidenceLevel);
+    
+    // Get explanation if available
+    if (grammarCheck.vocab_to_learn && grammarCheck.vocab_to_learn.length > 0) {
+      const explanations = grammarCheck.vocab_to_learn
+        .filter(item => item.explanation)
+        .map(item => item.explanation);
+      if (explanations.length > 0) {
+        message.correction_explanation = explanations.join('; ');
+      }
+    }
+    
+    // Create highlighted correction (simplified for WeChat rich-text)
+    message.highlighted_correction = this.createHighlightedCorrection(
+      grammarCheck.corrected_input, 
+      grammarCheck.vocab_to_learn
+    );
+  },
+  
+  /**
+   * Calculate correction confidence (from talkai_py ui.py)
+   */
+  calculateCorrectionConfidence: function(vocabToLearn) {
+    if (!vocabToLearn || vocabToLearn.length === 0) {
+      return 'high';
+    }
+    
+    const highConfidenceTypes = ['translation', 'vocabulary'];
+    const lowConfidenceTypes = ['grammar', 'collocation'];
+    
+    let highConfidenceCount = 0;
+    let lowConfidenceCount = 0;
+    
+    vocabToLearn.forEach(item => {
+      const errorType = item.error_type || 'vocabulary';
+      if (highConfidenceTypes.includes(errorType)) {
+        highConfidenceCount += 2;
+      } else if (lowConfidenceTypes.includes(errorType)) {
+        lowConfidenceCount += 1;
+      }
+    });
+    
+    return highConfidenceCount >= lowConfidenceCount ? 'high' : 'medium';
+  },
+  
+  /**
+   * Get confidence indicator (from talkai_py ui.py)
+   */
+  getConfidenceIndicator: function(confidenceLevel) {
+    switch (confidenceLevel) {
+      case 'high':
+        return '✓';  // Green checkmark
+      case 'medium':
+        return '⚠';  // Warning sign
+      default:
+        return '?';   // Question mark
+    }
+  },
+  
+  /**
+   * Create highlighted correction text for rich-text display
+   */
+  createHighlightedCorrection: function(correctedInput, vocabToLearn) {
+    if (!correctedInput || !vocabToLearn || vocabToLearn.length === 0) {
+      return correctedInput;
+    }
+    
+    let highlightedText = correctedInput;
+    
+    // Simple highlighting - replace corrected words with colored spans
+    vocabToLearn.forEach(item => {
+      if (item.corrected && item.corrected !== item.original) {
+        const color = this.getErrorTypeColor(item.error_type);
+        // For WeChat rich-text, use simple HTML-like format
+        const pattern = new RegExp('\\b' + this.escapeRegExp(item.corrected) + '\\b', 'gi');
+        highlightedText = highlightedText.replace(pattern, 
+          `<span style="color: ${color}; font-weight: bold;">${item.corrected}</span>`
+        );
+      }
+    });
+    
+    // Wrap entire text in green for correct parts
+    return `<span style="color: #27ae60;">${highlightedText}</span>`;
+  },
+  
+  /**
+   * Get color for different error types (from talkai_py ui.py)
+   */
+  getErrorTypeColor: function(errorType) {
+    const colorMap = {
+      'translation': '#e74c3c',   // Red for translations
+      'vocabulary': '#f39c12',    // Orange for vocabulary
+      'collocation': '#9b59b6',   // Purple for collocations
+      'grammar': '#2980b9'        // Blue for grammar
+    };
+    return colorMap[errorType] || '#e74c3c';
+  },
+  
+  /**
+   * Escape special regex characters
+   */
+  escapeRegExp: function(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  },
+  
+  /**
+   * Add vocabulary suggestion as system message (like talkai_py)
+   */
+  addVocabSuggestionMessage: function(suggestedVocab) {
+    const wordList = suggestedVocab.map(word => `<b>${word}</b>`).join(', ');
+    
+    const suggestionMessage = {
+      id: Date.now() + 2,
+      type: 'system',
+      content: `推荐词汇练习: ${wordList}`,
+      time: this.formatTime(new Date()),
+      suggested_vocab: suggestedVocab,
+      isVocabSuggestion: true
+    };
+    
+    this.setData({
+      messages: [...this.data.messages, suggestionMessage]
+    });
+  },
+  
+  /**
+   * Handle vocabulary suggestion tap
+   */
+  onVocabSuggestionTap: function(e) {
+    const word = e.currentTarget.dataset.word;
+    if (word) {
+      // Navigate to dictionary page to look up the word
+      wx.navigateTo({
+        url: `/pages/dict/dict?word=${encodeURIComponent(word)}`
+      });
+    }
+  },
+  
   /**
    * Format time
    */
