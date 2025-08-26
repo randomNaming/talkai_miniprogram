@@ -371,7 +371,7 @@ Page({
   },
 
   /**
-   * Send message using authenticated chat API
+   * Send message using authenticated chat API with progressive display (like talkai_py MessageProcessingThread)
    */
   sendAuthenticatedMessage: function(text) {
     console.log('Sending authenticated chat message...');
@@ -387,7 +387,9 @@ Page({
       return api.chat.sendMessage(requestData);
     }).then(result => {
       console.log('Chat API response:', result);
-      this.handleApiResponse(result);
+      
+      // 实现渐进式显示，模拟talkai_py的MessageProcessingThread
+      this.handleProgressiveResponse(result);
     }).catch(err => {
       console.error('Chat API failed:', err);
       
@@ -395,6 +397,70 @@ Page({
       console.log('Falling back to dict AI endpoint...');
       this.sendFallbackMessage(text);
     });
+  },
+
+  /**
+   * Handle API response with progressive display like talkai_py MessageProcessingThread
+   */
+  handleProgressiveResponse: function(result) {
+    console.log('Starting progressive response display...');
+
+    // Step 1: Immediately show AI response (like talkai_py thread ai_response_ready signal)
+    const aiMessage = {
+      id: Date.now() + 1,
+      type: 'ai',
+      content: result.response,
+      time: this.formatTime(new Date()),
+      // Initially don't show grammar check and vocab suggestions
+      grammar_check: null,
+      suggested_vocab: []
+    };
+
+    this.setData({
+      messages: [...this.data.messages, aiMessage],
+      isLoading: false
+    });
+    this.scrollToBottom();
+
+    // Step 2: Process and show grammar correction after a short delay (like talkai_py thread correction_ready signal)
+    setTimeout(() => {
+      if (result.grammar_check && result.grammar_check.has_error) {
+        console.log('Adding grammar correction...');
+        
+        // Update the AI message with grammar correction
+        const messages = [...this.data.messages];
+        const lastMessage = messages[messages.length - 1];
+        
+        lastMessage.grammar_check = result.grammar_check;
+        this.enhanceGrammarCorrection(lastMessage);
+        
+        this.setData({
+          messages: messages
+        });
+        this.scrollToBottom();
+      }
+    }, 800); // 0.8s delay like talkai_py
+
+    // Step 3: Show vocabulary suggestions after another delay (like talkai_py thread vocabulary_ready signal)
+    setTimeout(() => {
+      if (result.suggested_vocab && result.suggested_vocab.length > 0) {
+        console.log('Adding vocabulary suggestions...');
+        
+        // Update the AI message with vocabulary suggestions
+        const messages = [...this.data.messages];
+        const lastMessage = messages[messages.length - 1];
+        
+        lastMessage.suggested_vocab = result.suggested_vocab;
+        
+        this.setData({
+          messages: messages
+        });
+        this.scrollToBottom();
+      }
+      
+      // Save cached messages after all processing is complete
+      this.saveCachedMessages();
+    }, 1600); // 1.6s total delay like talkai_py
   },
 
   /**
@@ -416,7 +482,8 @@ Page({
       success: (res) => {
         console.log('Fallback dict AI response:', res.statusCode, res.data);
         if (res.statusCode === 200) {
-          this.handleApiResponse(res.data);
+          // Use progressive display for fallback too
+          this.handleProgressiveResponse(res.data);
         } else {
           this.handleApiError(new Error(res.data?.detail || 'Request failed'));
         }
@@ -455,10 +522,7 @@ Page({
       isLoading: false
     });
     
-    // Add vocabulary suggestions as system message (like talkai_py)
-    if (result.suggested_vocab && result.suggested_vocab.length > 0) {
-      this.addVocabSuggestionMessage(result.suggested_vocab);
-    }
+    // 词汇推荐已经包含在aiMessage中，不需要再次添加系统消息
 
     this.scrollToBottom();
     this.saveCachedMessages();

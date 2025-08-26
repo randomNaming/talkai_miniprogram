@@ -197,6 +197,38 @@ const user = {
       url: '/user/stats',
       method: 'GET'
     });
+  },
+  
+  /**
+   * Get available learning grades
+   */
+  getAvailableGrades() {
+    return request({
+      url: '/user/profile/grades',
+      method: 'GET',
+      skipAuth: true  // This endpoint doesn't require authentication
+    });
+  },
+  
+  /**
+   * Load vocabulary for current grade
+   */
+  loadVocab() {
+    return request({
+      url: '/user/profile/load-vocab',
+      method: 'POST',
+      data: {}
+    });
+  },
+  
+  /**
+   * Get vocabulary status
+   */
+  getVocabStatus() {
+    return request({
+      url: '/user/profile/vocab-status',
+      method: 'GET'
+    });
   }
 };
 

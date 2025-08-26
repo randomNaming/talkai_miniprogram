@@ -1,12 +1,15 @@
 # CLAUDE.md
+## 在每个代码文件开头详细注释本文件的代码逻辑。
+## 请将每次在claude code 输入提示词追加到CLAUDE_HISTORY.md， 并标注时间。
 
 ## 本地开发
-请激活虚拟开发环境
+ 请激活虚拟开发环境
   source /Users/pean/aiproject/talkai_mini/talkai_py/bookvidenv_new/bin/activate
+ 启动后端
   cd /Users/pean/aiproject/talkai_mini/backend
   uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
-## 线上部署：用 Docker 
+<!-- ## 线上部署：用 Docker  -->
 
 
 ## The following content provides guidance to Claude Code (claude.ai/code) when working with code in this repository.

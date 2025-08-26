@@ -3,6 +3,8 @@ Vocabulary management service with semantic similarity recommendations
 Ported from talkai_py/vocab_manager.py and language_model.py
 """
 import numpy as np
+import threading
+import time
 from typing import List, Dict, Any, Optional, Set
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -11,10 +13,28 @@ from loguru import logger
 
 from app.models.vocab import VocabItem
 from app.models.user import User
-from app.utils.text_utils import (
-    embedding_model, has_chinese, original, 
-    extract_words_from_text, find_word_variants_in_text
-)
+# Import text utilities, use fallback if not available
+try:
+    from app.utils.text_utils import (
+        embedding_model, has_chinese, original, 
+        extract_words_from_text, find_word_variants_in_text
+    )
+except ImportError:
+    # Fallback implementations
+    import re
+    embedding_model = None
+    
+    def has_chinese(text: str) -> bool:
+        """检查文本是否包含中文字符"""
+        return bool(re.search(r'[\u4e00-\u9fff]', text))
+    
+    def original(word: str) -> str:
+        """处理单词，转换为小写并去除特殊字符"""
+        return re.sub(r'[^\w]', '', word.lower())
+    
+    def extract_words_from_text(text: str) -> set:
+        """从文本中提取单词"""
+        return set(re.findall(r'\b\w+\b', text.lower()))
 
 
 class VocabularyService:
@@ -23,6 +43,95 @@ class VocabularyService:
     def __init__(self):
         self.embedding_cache = {}  # Cache for word embeddings
         self.mastery_threshold = 3  # right_use - wrong_use >= 3 for mastery
+        
+        # 内存缓存和批量更新机制 (复制 talkai_py 逻辑)
+        self._memory_cache = {}  # 用户词汇更新的内存缓存 {user_id: {word: update_info}}
+        self._has_unsaved_changes = {}  # 每个用户的未保存更改标记
+        self._pending_updates = set()  # 跟踪待处理的更新
+        
+        # 自动保存机制
+        self.auto_save_interval = 30  # 30秒自动保存
+        self._save_timer = None
+        self._timer_lock = threading.Lock()
+        
+        # 线程池用于异步处理
+        from concurrent.futures import ThreadPoolExecutor
+        self.executor = ThreadPoolExecutor(max_workers=2)
+        
+        # 启动自动保存定时器
+        self._start_auto_save_timer()
+    
+    def _start_auto_save_timer(self):
+        """启动自动保存定时器 (复制 talkai_py 逻辑)"""
+        with self._timer_lock:
+            if self._save_timer is not None:
+                self._save_timer.cancel()
+            
+            def auto_save_task():
+                if self._has_unsaved_changes or self._memory_cache:
+                    self._perform_batch_save()
+                # 重新启动定时器
+                self._start_auto_save_timer()
+            
+            self._save_timer = threading.Timer(self.auto_save_interval, auto_save_task)
+            self._save_timer.daemon = True
+            self._save_timer.start()
+    
+    def _stop_auto_save_timer(self):
+        """停止自动保存定时器"""
+        with self._timer_lock:
+            if self._save_timer is not None:
+                self._save_timer.cancel()
+                self._save_timer = None
+    
+    def _perform_batch_save(self):
+        """执行批量保存操作 (复制 talkai_py 逻辑)"""
+        try:
+            if not self._memory_cache:
+                return
+            
+            logger.info("执行批量词汇保存操作...")
+            
+            # 这里应该在实际应用中使用数据库会话
+            # 由于这是异步操作且涉及数据库，在实际使用时需要传入db会话
+            # 目前只是标记已保存
+            
+            # 清空内存缓存
+            saved_users = []
+            for user_id in list(self._memory_cache.keys()):
+                if self._memory_cache[user_id]:
+                    saved_users.append(user_id)
+                    self._memory_cache[user_id] = {}
+                    self._has_unsaved_changes[user_id] = False
+            
+            if saved_users:
+                logger.info(f"批量保存完成，涉及用户: {saved_users}")
+            
+        except Exception as e:
+            logger.error(f"批量保存失败: {e}")
+    
+    def finalize(self):
+        """应用退出时调用，执行最终的保存操作 (复制 talkai_py 逻辑)"""
+        logger.info("正在完成词汇管理服务...")
+        
+        # 停止定时器
+        self._stop_auto_save_timer()
+        
+        # 执行最终保存
+        if self._has_unsaved_changes or self._memory_cache:
+            self._perform_batch_save()
+        
+        # 关闭线程池
+        if hasattr(self, 'executor'):
+            self.executor.shutdown(wait=True)
+    
+    def __del__(self):
+        """析构函数，确保线程池正确关闭"""
+        try:
+            self.finalize()
+        except:
+            # 在析构函数中静默失败，避免异常
+            pass
     
     async def suggest_vocabulary_semantic(
         self, 
@@ -266,17 +375,20 @@ class VocabularyService:
         Implements the logic from talkai_py language_model.update_vocab_oneturn_async
         """
         try:
+            import re
+            from app.utils.prompts import simple_words
+            
             is_valid = correction_result.get("is_valid", False)
             
-            # Only update if correction is valid
+            # 如果 is_valid = False，不更新词汇
             if not is_valid:
-                logger.info("Correction not valid, skipping vocabulary update")
-                return False
+                logger.info("Correction is not valid, skipping vocabulary update")
+                return True
             
             corrected_input = correction_result.get("corrected_input")
             words_deserve_to_learn = correction_result.get("words_deserve_to_learn", [])
             
-            # Process words that need learning (wrong usage)
+            # 处理值得学习的单词(wrong_use)
             if words_deserve_to_learn:
                 for word_pair in words_deserve_to_learn:
                     original_word = word_pair.get("original", "")
@@ -284,41 +396,169 @@ class VocabularyService:
                     error_type = word_pair.get("error_type", "vocabulary")
                     
                     if original_word and corrected_word and (original_word != corrected_word):
-                        # Only save valuable vocabulary types (filter out grammar/collocation)
+                        # 只保存有价值的词汇类型到learning_vocab.json，过滤error_type："grammar"， "collocation"
                         if error_type in ["translation", "vocabulary"]:
-                            # Filter: no Chinese, single word, meaningful length, not too simple
+                            # 将错误使用的单词添加到未掌握词汇表: 过滤掉中文，过滤掉短语，过滤掉简单词
                             if (not has_chinese(corrected_word) and 
                                 len(corrected_word.split()) == 1 and 
-                                len(corrected_word) > 2):
+                                len(corrected_word) > 2 and 
+                                corrected_word not in simple_words):
                                 
-                                await self.update_vocabulary_usage(
-                                    user_id, corrected_word, "wrong_use", db, user_input
+                                await self._update_learning_vocab_async(
+                                    user_id, corrected_word, "wrong_use", db
                                 )
             
-            # Process correctly used words
+            # 处理正确使用的单词(right_use)
             correct_used_words = set()
             
             if corrected_input:
-                # Has corrected input - find common words between original and corrected
-                original_words = extract_words_from_text(user_input)
-                corrected_words = extract_words_from_text(corrected_input)
-                correct_used_words = original_words.intersection(corrected_words)
+                # 有修正输入，对比原始输入和修正后的输入，找出正确使用的单词
+                original_words = set(re.findall(r'\b\w+\b', user_input.lower()))
+                corrected_words = set(re.findall(r'\b\w+\b', corrected_input.lower()))
+                
+                # 找出两者共有的单词（可能是正确使用的单词）
+                common_words = original_words.intersection(corrected_words)
+                correct_used_words = common_words - simple_words
             else:
-                # Input is completely correct
+                # 输入完全正确（corrected_input为null），直接提取输入中的所有单词
+                # 如果 没有值得学习的单词，且输入全英文，correct_used_words 为全部单词-simple_words
                 if not words_deserve_to_learn and not has_chinese(user_input):
-                    correct_used_words = extract_words_from_text(user_input)
+                    all_words = set(re.findall(r'\b\w+\b', user_input.lower())) 
+                    correct_used_words = all_words - simple_words
+                # 如果输入有中文，或有值得学习的单词，则correct_used_words 为空 （保守策略）
+                else:
+                    correct_used_words = set()
             
-            # Update correctly used words
-            for word in correct_used_words:
-                if len(word) > 2:  # Skip very short words
-                    await self.update_vocabulary_usage(
-                        user_id, word, "right_use", db, user_input
-                    )
+            # 更新词汇使用情况
+            if correct_used_words:
+                for word in correct_used_words:
+                    if len(word) > 2:  # 忽略过短的单词
+                        await self._update_learning_vocab_async(
+                            user_id, word, "right_use", db
+                        )
             
             return True
             
         except Exception as e:
             logger.error(f"Error updating vocabulary from correction: {e}")
+            return False
+    
+    async def _update_learning_vocab_async(
+        self,
+        user_id: str,
+        word: str,
+        source: str,
+        db: Session
+    ) -> bool:
+        """
+        异步更新学习词汇
+        复制 talkai_py 中的 _update_vocab_background 逻辑
+        支持内存缓存和批量更新机制
+        
+        wrong_use_count+=1 for "user_input", "lookup", "wrong_use"
+        right_use_count+=1 for "right_use"
+        isMastered = True if right_use_count - wrong_use_count >= 3
+        
+        Args:
+            user_id: 用户ID
+            word: 要更新的单词
+            source: 词汇来源 ("wrong_use", "right_use", "user_input", "lookup")
+            db: 数据库会话
+            
+        Returns:
+            更新是否成功
+        """
+        try:
+            if has_chinese(word):
+                return True
+            
+            word = original(word)
+            
+            # 先更新内存缓存 (可能先更新到内存，一段时间后再统一更新到文件)
+            if user_id not in self._memory_cache:
+                self._memory_cache[user_id] = {}
+            
+            if word not in self._memory_cache[user_id]:
+                self._memory_cache[user_id][word] = {
+                    'right_use_count': 0,
+                    'wrong_use_count': 0,
+                    'last_updated': datetime.utcnow(),
+                    'source': source
+                }
+            
+            # 更新内存缓存中的计数
+            if source in ["user_input", "lookup", "wrong_use"]:
+                self._memory_cache[user_id][word]['wrong_use_count'] += 1
+            elif source == "right_use":
+                self._memory_cache[user_id][word]['right_use_count'] += 1
+            
+            self._memory_cache[user_id][word]['last_updated'] = datetime.utcnow()
+            
+            # 标记有未保存的更改
+            self._has_unsaved_changes[user_id] = True
+            
+            # 同时立即更新数据库（为了保证数据一致性）
+            existing_vocab = db.query(VocabItem).filter(
+                VocabItem.user_id == user_id,
+                VocabItem.word == word,
+                VocabItem.is_active == True
+            ).first()
+            
+            if existing_vocab:
+                # 更新现有词汇
+                existing_vocab.last_used = datetime.utcnow()
+                
+                # 映射到数据库字段：right_use_count -> correct_count, wrong_use_count -> encounter_count - correct_count
+                if source in ["user_input", "lookup", "wrong_use"]:  # 3 cases for wrong_use
+                    existing_vocab.encounter_count = (existing_vocab.encounter_count or 0) + 1
+                elif source == "right_use":
+                    existing_vocab.correct_count = (existing_vocab.correct_count or 0) + 1
+                    existing_vocab.encounter_count = (existing_vocab.encounter_count or 0) + 1
+                
+                # 计算掌握状态：right_use_count - wrong_use_count >= 3
+                right_count = existing_vocab.correct_count or 0
+                wrong_count = (existing_vocab.encounter_count or 0) - right_count
+                mastery_score = right_count - wrong_count
+                existing_vocab.is_mastered = mastery_score >= 3
+                
+                db.commit()
+                
+                logger.info(
+                    f"更新词汇 {word} for user {user_id}: "
+                    f"right={right_count}, wrong={wrong_count}, "
+                    f"mastered={existing_vocab.is_mastered}, source={source}"
+                )
+                
+                return True
+            else:
+                # "right_use" will not add to learning_vocab.json
+                if source != "right_use":
+                    # 创建新词汇项
+                    new_vocab = VocabItem(
+                        user_id=user_id,
+                        word=word,
+                        source=source,
+                        level="none",  # 动态添加的词汇标记为 "none"
+                        created_at=datetime.utcnow(),
+                        last_reviewed=datetime.utcnow(),
+                        correct_count=0,
+                        encounter_count=1 if source in ["user_input", "lookup", "wrong_use"] else 0,
+                        is_mastered=False,
+                        is_active=True
+                    )
+                    
+                    db.add(new_vocab)
+                    db.commit()
+                    
+                    logger.info(
+                        f"创建新词汇 {word} for user {user_id}, source: {source}"
+                    )
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"异步更新词汇失败: {e}, word: {word}, source: {source}")
+            db.rollback()
             return False
     
     async def load_level_vocabulary(

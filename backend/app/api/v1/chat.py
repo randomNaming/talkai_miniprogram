@@ -59,6 +59,154 @@ async def send_message(
     db: Session = Depends(get_db)
 ):
     """
+    LEGACY API: 发送消息并获取完整响应 (保持向后兼容)
+    建议使用新的流式API: /send-stream
+    """
+    return await _send_message_complete(chat_request, current_user, db)
+
+
+@router.post("/send-stream")
+async def send_message_stream(
+    chat_request: ChatRequest,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    流式消息发送 - 分线程独立输出减少用户等待时间
+    复制 talkai_py 中 MessageProcessingThread 的逻辑
+    
+    返回格式：
+    1. 立即返回 AI 对话响应
+    2. 后台异步处理语法纠正和词汇建议
+    3. 支持分步骤接收结果
+    """
+    import asyncio
+    from fastapi.responses import StreamingResponse
+    import json
+    
+    try:
+        user_id = current_user["sub"]
+        user_input = chat_request.message.strip()
+        
+        if not user_input:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Message cannot be empty"
+            )
+        
+        # Get user profile
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        user_profile = {
+            "user_id": user_id,
+            "age": user.age,
+            "gender": user.gender,
+            "grade": user.grade,
+            "preferred_ai_model": user.preferred_ai_model
+        }
+        
+        async def stream_generator():
+            """生成器函数，依次返回各个处理步骤的结果"""
+            
+            # 步骤1: 立即生成AI对话响应
+            logger.info(f"Stream Step 1: Generating natural dialogue response for user {user_id}")
+            response_result = ai_service.generate_response_natural(
+                user_input=user_input,
+                user_profile=user_profile,
+                user_id=user_id
+            )
+            ai_response = response_result.get("text", "")
+            
+            # 立即返回AI响应
+            yield f"data: {json.dumps({'type': 'ai_response', 'content': ai_response})}\n\n"
+            
+            # 步骤2: 异步语法检查
+            logger.info(f"Stream Step 2: Starting grammar check")
+            try:
+                grammar_result = ai_service.check_vocab_from_input(user_input)
+                yield f"data: {json.dumps({'type': 'grammar_check', 'content': grammar_result})}\n\n"
+            except Exception as e:
+                logger.error(f"Grammar check failed: {e}")
+                yield f"data: {json.dumps({'type': 'error', 'content': f'Grammar check failed: {str(e)}'})}\n\n"
+            
+            # 步骤3: 异步词汇建议
+            logger.info(f"Stream Step 3: Starting vocabulary suggestions")
+            try:
+                suggested_vocab = await ai_service.suggest_vocabulary(
+                    user_id=user_id,
+                    user_input=user_input,
+                    ai_response=ai_response,
+                    db=db
+                )
+                yield f"data: {json.dumps({'type': 'vocabulary_suggestions', 'content': suggested_vocab})}\n\n"
+            except Exception as e:
+                logger.error(f"Vocabulary suggestion failed: {e}")
+                yield f"data: {json.dumps({'type': 'error', 'content': f'Vocabulary suggestion failed: {str(e)}'})}\n\n"
+            
+            # 步骤4: 异步词汇更新 (如果有语法纠正结果)
+            if 'grammar_result' in locals() and grammar_result:
+                logger.info(f"Stream Step 4: Starting vocabulary update")
+                try:
+                    await ai_service.update_vocabulary_from_correction(
+                        grammar_result=grammar_result,
+                        user_input=user_input,
+                        user_id=user_id,
+                        db=db
+                    )
+                    yield f"data: {json.dumps({'type': 'vocab_update_complete', 'content': 'success'})}\n\n"
+                except Exception as e:
+                    logger.error(f"Vocabulary update failed: {e}")
+                    yield f"data: {json.dumps({'type': 'error', 'content': f'Vocabulary update failed: {str(e)}'})}\n\n"
+            
+            # 步骤5: 保存聊天记录
+            try:
+                chat_record = ChatRecord(
+                    user_id=user_id,
+                    user_input=user_input,
+                    ai_response=ai_response,
+                    ai_correction=grammar_result.get("corrected_input") if 'grammar_result' in locals() and grammar_result.get("has_error") else None,
+                    created_at=datetime.utcnow()
+                )
+                db.add(chat_record)
+                db.commit()
+                
+                yield f"data: {json.dumps({'type': 'chat_saved', 'content': 'success'})}\n\n"
+            except Exception as e:
+                logger.error(f"Chat record save failed: {e}")
+                yield f"data: {json.dumps({'type': 'error', 'content': f'Chat record save failed: {str(e)}'})}\n\n"
+            
+            # 完成信号
+            yield f"data: {json.dumps({'type': 'complete', 'content': 'all_tasks_completed'})}\n\n"
+        
+        return StreamingResponse(
+            stream_generator(),
+            media_type="text/plain",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "Content-Type": "text/event-stream"
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Stream chat failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Chat failed: {str(e)}"
+        )
+
+
+async def _send_message_complete(
+    chat_request: ChatRequest,
+    current_user: dict,
+    db: Session
+) -> ChatResponse:
+    """
     Send a message and get AI response with grammar correction
     
     Following talkai_py pattern:

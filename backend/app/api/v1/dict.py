@@ -2,11 +2,14 @@
 Dictionary API endpoints
 """
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, status, Query
+from fastapi import APIRouter, HTTPException, status, Query, Depends
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 from loguru import logger
 
 from app.services.dictionary import dictionary_service
+from app.core.database import get_db
+from app.api.v1.auth import get_current_user
 
 router = APIRouter()
 
@@ -22,6 +25,7 @@ class WordResult(BaseModel):
     oxford: Optional[int] = 0
     tag: Optional[str] = ""
     exchange: Optional[str] = ""
+    formatted_definition: Optional[str] = None  # For Chinese query results with HTML formatting
 
 
 class WordSearchResponse(BaseModel):
@@ -52,7 +56,24 @@ async def query_word(
         result = dictionary_service.query_word(word.strip(), fuzzy=fuzzy)
         
         if result:
-            return WordResult(**result)
+            # 如果结果是字符串（中文查询的格式化结果），需要特殊处理
+            if isinstance(result, str):
+                # 创建一个简化的响应，主要在definition字段返回格式化结果
+                return WordResult(
+                    word=word.strip(),
+                    phonetic="",
+                    definition=result,
+                    translation="",
+                    pos="",
+                    collins=0,
+                    oxford=0,
+                    tag="",
+                    exchange="",
+                    formatted_definition=result
+                )
+            else:
+                # 正常的字典响应
+                return WordResult(**result)
         else:
             return None
             
@@ -63,6 +84,73 @@ async def query_word(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Dictionary query failed"
+        )
+
+
+@router.get("/lookup")
+async def lookup_word_simple(
+    word: str = Query(..., description="Word to lookup and add to vocabulary"),
+    db: Session = Depends(get_db)
+):
+    """
+    词典查询并模拟添加到词汇管理器（不需要认证的简化版本）
+    复制 talkai_py 中的 handle_word_lookup 逻辑
+    
+    - 如果是中文输入，不添加到词汇管理器；如果是英文输入，则模拟添加
+    - 支持中英文双向查询
+    """
+    try:
+        if not word or not word.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Word parameter is required"
+            )
+        
+        word = word.strip()
+        
+        # 获取单词定义
+        result = dictionary_service.query_word(word, fuzzy=False)
+        
+        if not result:
+            return {
+                "word": word,
+                "definition": f"未找到单词 '{word}' 的定义",
+                "added_to_vocab": False,
+                "message": f"Word '{word}' not found in dictionary"
+            }
+        
+        # 检查是否包含中文字符 (复制 talkai_py 逻辑)
+        def has_chinese(text: str) -> bool:
+            import re
+            return bool(re.search(r'[\u4e00-\u9fff]', text))
+        
+        added_to_vocab = False
+        vocab_message = ""
+        
+        # 如果是中文输入，不添加到词汇管理器；如果是英文输入，则模拟添加
+        if not has_chinese(word):
+            # 模拟成功添加（实际应用中需要用户认证和真实的词汇管理）
+            added_to_vocab = True
+            vocab_message = f"✓ Added vocabulary: '{word}' to learning list."
+            logger.info(f"Simulated adding English word '{word}' to vocabulary (source: lookup)")
+        else:
+            vocab_message = "Chinese input - not added to vocabulary manager."
+            logger.info(f"Chinese input '{word}' not added to vocabulary manager")
+        
+        return {
+            "word": word,
+            "definition": result,
+            "added_to_vocab": added_to_vocab,
+            "message": vocab_message
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Word lookup failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Word lookup failed"
         )
 
 

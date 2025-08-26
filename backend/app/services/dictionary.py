@@ -20,12 +20,20 @@ class DictionaryService:
         """Check if text contains Chinese characters"""
         return bool(re.search(r'[\u4e00-\u9fff]', text))
     
-    def _format_word_result(self, word_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Format word result for API response"""
+    def _format_word_result(self, word_data: Dict[str, Any], is_chinese_query: bool = False) -> Dict[str, Any]:
+        """
+        Format word result for API response
+        复制 talkai_py 中的格式化逻辑
+        """
         if not word_data:
             return None
         
-        return {
+        # 如果是中文查询，使用talkai_py的格式化逻辑返回字符串
+        if is_chinese_query:
+            return self._format_chinese_query_result(word_data)
+        
+        # 英文查询，使用常规字典格式
+        result = {
             "word": word_data.get("word") or "",
             "phonetic": word_data.get("phonetic") or "",
             "definition": word_data.get("definition") or "",
@@ -34,8 +42,51 @@ class DictionaryService:
             "collins": word_data.get("collins") or 0,
             "oxford": word_data.get("oxford") or 0,
             "tag": word_data.get("tag") or "",
-            "exchange": word_data.get("exchange") or ""
+            "exchange": word_data.get("exchange") or "",
+            "formatted_definition": None
         }
+        
+        return result
+    
+    def _format_chinese_query_result(self, word_data: Dict[str, Any]) -> str:
+        """
+        格式化中文查询的英文结果显示，完全复制 talkai_py/ecdict.py 的 format_word_result 逻辑
+        """
+        try:
+            if not word_data:
+                return None
+            
+            result = []
+            
+            # 第一行：单词和音标 (复制 talkai_py/ecdict.py:32-35)
+            first_line = word_data.get("word", "")
+            if word_data.get('phonetic'):
+                first_line += f"    <phonetic>{word_data['phonetic']}</phonetic>"
+            result.append(first_line)
+            
+            # 第二行：释义（definition 或 translation）(复制 talkai_py/ecdict.py:37-45)
+            definition_line = ""
+            if word_data.get('definition'):
+                definition_line = word_data['definition']
+            elif word_data.get('translation'):
+                definition_line = word_data['translation']
+            
+            if definition_line:
+                result.append(definition_line)
+            
+            return "\n".join(result)
+            
+        except Exception as e:
+            logger.error(f"Error formatting Chinese query result: {e}")
+            definition = word_data.get("definition", "") or word_data.get("translation", "")
+            word = word_data.get("word", "")
+            phonetic = word_data.get("phonetic", "")
+            
+            # 基本格式的后备方案
+            if phonetic:
+                return f"{word}    <phonetic>{phonetic}</phonetic>\n{definition}"
+            else:
+                return f"{word}\n{definition}"
     
     def _search_chinese_in_translation(self, chinese_text: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Search for Chinese text in definition and translation fields"""
@@ -47,15 +98,14 @@ class DictionaryService:
             conn = sqlite3.connect(self.dict_path)
             cursor = conn.cursor()
             
-            # Search for records containing the Chinese text
+            # 获取所有可能包含该中文的记录 (完全复制 talkai_py/ecdict.py:78-85)
             sql = """
             SELECT word, phonetic, definition, translation, pos, collins, oxford, tag, exchange 
             FROM stardict 
             WHERE definition LIKE ? OR translation LIKE ? 
-            LIMIT ?
             """
             search_pattern = f'%{chinese_text}%'
-            cursor.execute(sql, (search_pattern, search_pattern, limit * 2))
+            cursor.execute(sql, (search_pattern, search_pattern))
             
             results = []
             seen_words = set()
@@ -174,17 +224,27 @@ class DictionaryService:
             
             # Auto-detect Chinese query
             if self._is_chinese(word):
-                # Chinese to English lookup
-                results = self._search_chinese_in_translation(word, limit=1)
-                if results:
-                    return self._format_word_result(results[0])
+                # Chinese to English lookup - 复制 talkai_py/language_model.py:371-374
+                results = self._search_chinese_in_translation(word, limit=10)
+                if results and len(results) > 0:
+                    # 使用 format_multiple_word_results 逻辑
+                    formatted_results = []
+                    for word_data in results[:5]:  # limit=5 如 talkai_py
+                        formatted = self._format_word_result(word_data, is_chinese_query=True)
+                        if formatted:
+                            formatted_results.append(formatted)
+                    
+                    if formatted_results:
+                        return "\n\n".join(formatted_results)
+                    else:
+                        return None
                 else:
                     return None
             else:
                 # English word lookup
                 word_data = self._query_english_word(word, fuzzy=fuzzy)
                 if word_data:
-                    return self._format_word_result(word_data)
+                    return self._format_word_result(word_data, is_chinese_query=False)
                 else:
                     return None
                     
@@ -210,9 +270,30 @@ class DictionaryService:
                 return []
             
             if self._is_chinese(query):
-                # Chinese to English search
+                # Chinese to English search - 复制 talkai_py 的 format_multiple_word_results 逻辑
                 results = self._search_chinese_in_translation(query, limit=limit)
-                return [self._format_word_result(result) for result in results]
+                formatted_results = []
+                for result in results:
+                    formatted = self._format_word_result(result, is_chinese_query=True)
+                    if formatted:
+                        formatted_results.append(formatted)
+                # 对于中文查询，返回单个组合的格式化字符串
+                if formatted_results:
+                    combined_result = "\n\n".join(formatted_results)
+                    return [{
+                        "word": query,
+                        "phonetic": "",
+                        "definition": combined_result,
+                        "translation": "",
+                        "pos": "",
+                        "collins": 0,
+                        "oxford": 0,
+                        "tag": "",
+                        "exchange": "",
+                        "formatted_definition": combined_result
+                    }]
+                else:
+                    return []
             else:
                 # English word search (fuzzy)
                 if not os.path.exists(self.dict_path):
@@ -244,7 +325,7 @@ class DictionaryService:
                         'tag': row[7],
                         'exchange': row[8]
                     }
-                    results.append(self._format_word_result(word_data))
+                    results.append(self._format_word_result(word_data, is_chinese_query=False))
                 
                 conn.close()
                 return results

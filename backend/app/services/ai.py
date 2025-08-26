@@ -546,17 +546,18 @@ class AIService:
     ) -> List[str]:
         """
         Generate vocabulary suggestions based on semantic similarity.
-        Uses the enhanced vocabulary service with talkai_py algorithm.
+        Uses the vocabulary embedding service with talkai_py algorithm.
+        复制 find_vocabulary_from_last_turn 逻辑
         """
         try:
-            from app.services.vocabulary import vocabulary_service
+            from app.services.vocabulary_embedding import vocabulary_embedding_service
             
-            suggestions = await vocabulary_service.suggest_vocabulary_semantic(
-                user_id=user_id,
-                user_input=user_input, 
+            suggestions = vocabulary_embedding_service.find_similar_vocabulary(
+                user_input=user_input,
                 ai_response=ai_response,
+                user_id=user_id,
                 db=db,
-                limit=settings.top_n_vocab or 5
+                top_n=settings.top_n_vocab or 5
             )
             
             return suggestions
@@ -575,19 +576,24 @@ class AIService:
         """
         Update vocabulary database based on grammar correction results.
         Uses the enhanced vocabulary service with talkai_py algorithm.
+        复制 talkai_py 的 update_vocab_oneturn_async 逻辑
         """
         try:
             from app.services.vocabulary import vocabulary_service
             
             # Convert grammar_result to the format expected by vocabulary service
+            # 确保与 talkai_py 的格式一致
             correction_result = {
                 "is_valid": grammar_result.get("is_valid", False),
                 "corrected_input": grammar_result.get("corrected_input"),
                 "words_deserve_to_learn": []
             }
             
-            # Convert vocab_to_learn to words_deserve_to_learn format
-            if grammar_result.get("vocab_to_learn"):
+            # Convert words_deserve_to_learn format (from grammar check result)
+            if grammar_result.get("words_deserve_to_learn"):
+                correction_result["words_deserve_to_learn"] = grammar_result["words_deserve_to_learn"]
+            # Fallback to vocab_to_learn if using different format
+            elif grammar_result.get("vocab_to_learn"):
                 for vocab_item in grammar_result["vocab_to_learn"]:
                     word_item = {
                         "original": vocab_item.get("original", ""),
@@ -597,7 +603,7 @@ class AIService:
                     }
                     correction_result["words_deserve_to_learn"].append(word_item)
             
-            # Use vocabulary service to update vocabulary
+            # Use vocabulary service to update vocabulary (same as talkai_py)
             success = await vocabulary_service.update_vocabulary_from_correction(
                 user_id=user_id,
                 correction_result=correction_result,

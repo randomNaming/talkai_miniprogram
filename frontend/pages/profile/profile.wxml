@@ -3,8 +3,17 @@
   <!-- User Header -->
   <view class="profile-header">
     <image class="avatar" src="{{userInfo.avatar_url}}" mode="aspectFill"></image>
-    <text class="nickname">{{userInfo.nickname || '英语学习者'}}</text>
-    <text class="user-level">{{userInfo.grade || 'Primary School'}}</text>
+    <view class="user-info">
+      <text class="nickname">{{userInfo.nickname || '英语学习者'}}</text>
+      <text class="user-level">{{userInfo.grade || 'Primary School'}}</text>
+      <view class="user-details">
+        <text class="detail" wx:if="{{userInfo.age}}">年龄: {{userInfo.age}}</text>
+        <text class="detail" wx:if="{{userInfo.gender}}">性别: {{userInfo.gender}}</text>
+      </view>
+    </view>
+    <button class="edit-btn" bindtap="onEditProfile">
+      <text class="edit-icon">✏️</text>
+    </button>
   </view>
 
   <!-- Statistics -->
@@ -30,8 +39,46 @@
     </view>
   </view>
 
+  <!-- Vocabulary Status -->
+  <view class="vocab-section" wx:if="{{vocabStatus.total_vocab_count}}">
+    <text class="section-title">词汇状态</text>
+    <view class="vocab-stats">
+      <view class="vocab-stat-item">
+        <text class="vocab-stat-number">{{vocabStatus.total_vocab_count}}</text>
+        <text class="vocab-stat-label">总词汇</text>
+      </view>
+      <view class="vocab-stat-item">
+        <text class="vocab-stat-number">{{vocabStatus.mastered_vocab_count}}</text>
+        <text class="vocab-stat-label">已掌握</text>
+      </view>
+      <view class="vocab-stat-item">
+        <text class="vocab-stat-number">{{vocabStatus.unmastered_vocab_count}}</text>
+        <text class="vocab-stat-label">学习中</text>
+      </view>
+      <view class="vocab-stat-item">
+        <text class="vocab-stat-number">{{Math.floor(vocabStatus.mastery_percentage)}}%</text>
+        <text class="vocab-stat-label">掌握率</text>
+      </view>
+    </view>
+    
+    <!-- Loaded Levels -->
+    <view class="loaded-levels" wx:if="{{vocabStatus.added_vocab_levels && vocabStatus.added_vocab_levels.length > 0}}">
+      <text class="levels-title">已加载等级:</text>
+      <view class="level-tags">
+        <text class="level-tag" wx:for="{{vocabStatus.added_vocab_levels}}" wx:key="*this">
+          {{item}} ({{vocabStatus.level_vocab_counts[item] || 0}})
+        </text>
+      </view>
+    </view>
+  </view>
+
   <!-- Actions -->
   <view class="actions-section">
+    <button class="action-btn" bindtap="onLoadVocab">
+      <text class="action-icon">📚</text>
+      <text class="action-text">加载{{userInfo.grade || 'Primary School'}}词汇</text>
+    </button>
+    
     <button class="action-btn" bindtap="onSync">
       <text class="action-icon">🔄</text>
       <text class="action-text">同步数据</text>
@@ -41,5 +88,66 @@
       <text class="action-icon">🚪</text>
       <text class="action-text">退出登录</text>
     </button>
+  </view>
+</view>
+
+<!-- Edit Profile Modal -->
+<view class="modal-overlay" wx:if="{{showEditModal}}" bindtap="onCloseEditModal">
+  <view class="modal-content" catchtap="">
+    <view class="modal-header">
+      <text class="modal-title">编辑个人资料</text>
+      <button class="modal-close" bindtap="onCloseEditModal">×</button>
+    </view>
+    
+    <view class="modal-body">
+      <!-- Nickname -->
+      <view class="form-field">
+        <text class="form-label">昵称:</text>
+        <input class="form-input" 
+               value="{{editProfile.nickname}}" 
+               data-field="nickname" 
+               bindinput="onEditInputChange"
+               placeholder="请输入昵称" />
+      </view>
+      
+      <!-- Age -->
+      <view class="form-field">
+        <text class="form-label">年龄:</text>
+        <input class="form-input" 
+               value="{{editProfile.age}}" 
+               data-field="age" 
+               bindinput="onEditInputChange"
+               type="number"
+               placeholder="请输入年龄" />
+      </view>
+      
+      <!-- Gender -->
+      <view class="form-field">
+        <text class="form-label">性别:</text>
+        <picker range="{{['Male', 'Female', 'Unspecified']}}" 
+                value="{{currentGenderIndex}}"
+                data-field="gender"
+                bindchange="onPickerChange">
+          <view class="form-picker">{{editProfile.gender || 'Unspecified'}}</view>
+        </picker>
+      </view>
+      
+      <!-- Grade -->
+      <view class="form-field">
+        <text class="form-label">学习等级:</text>
+        <picker range="{{availableGrades}}" 
+                range-key="grade"
+                value="{{currentGradeIndex}}"
+                data-field="grade"
+                bindchange="onPickerChange">
+          <view class="form-picker">{{editProfile.grade || 'Primary School'}}</view>
+        </picker>
+      </view>
+    </view>
+    
+    <view class="modal-footer">
+      <button class="modal-btn cancel" bindtap="onCloseEditModal">取消</button>
+      <button class="modal-btn save" bindtap="onSaveProfile">保存</button>
+    </view>
   </view>
 </view>

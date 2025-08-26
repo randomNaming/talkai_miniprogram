@@ -99,6 +99,22 @@ async def wechat_login(
             )
             db.add(user)
             logger.info(f"Created new user: {user_id}")
+            
+            # 新用户首次登录：自动初始化词汇库
+            db.commit()  # 先提交用户创建
+            db.refresh(user)
+            
+            # 根据默认grade (Primary School) 自动加载词汇
+            try:
+                from app.services.vocab_loader import vocab_loader
+                logger.info(f"为新用户 {user_id} 初始化词汇库 (grade: {user.grade})")
+                vocab_success = vocab_loader.load_vocab_by_grade(user_id, db)
+                if vocab_success:
+                    logger.info(f"新用户 {user_id} 词汇库初始化成功")
+                else:
+                    logger.warning(f"新用户 {user_id} 词汇库初始化失败")
+            except Exception as e:
+                logger.error(f"新用户词汇库初始化失败: {e}")
         else:
             # Update existing user
             user.last_login_at = datetime.utcnow()
@@ -107,9 +123,9 @@ async def wechat_login(
             if login_data.avatar_url:
                 user.avatar_url = login_data.avatar_url
             logger.info(f"User login: {user_id}")
-        
-        db.commit()
-        db.refresh(user)
+            
+            db.commit()
+            db.refresh(user)
         
         # Create access token
         token_data = {

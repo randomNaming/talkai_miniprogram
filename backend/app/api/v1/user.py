@@ -104,6 +104,10 @@ async def update_user_profile(
 ):
     """
     Update current user's profile information
+    
+    Following talkai_py pattern:
+    - When grade is updated, automatically load corresponding vocabulary level
+    - Monitor profile changes and update vocabulary accordingly
     """
     try:
         user_id = current_user["sub"]
@@ -115,6 +119,11 @@ async def update_user_profile(
                 detail="User not found"
             )
         
+        # 记录是否更新了 grade（用于后续自动加载词汇）
+        grade_updated = False
+        old_grade = user.grade
+        new_grade = None
+        
         # Update fields if provided
         if profile_update.nickname is not None:
             user.nickname = profile_update.nickname
@@ -123,7 +132,11 @@ async def update_user_profile(
         if profile_update.gender is not None:
             user.gender = profile_update.gender
         if profile_update.grade is not None:
-            user.grade = profile_update.grade
+            new_grade = profile_update.grade
+            if old_grade != new_grade:
+                grade_updated = True
+                logger.info(f"User {user_id} grade updated: {old_grade} -> {new_grade}")
+            user.grade = new_grade
         if profile_update.added_vocab_levels is not None:
             user.added_vocab_levels = profile_update.added_vocab_levels
         if profile_update.preferred_ai_model is not None:
@@ -134,7 +147,27 @@ async def update_user_profile(
         db.commit()
         db.refresh(user)
         
-        return UserProfileResponse(
+        # 如果 grade 更新了，自动加载对应等级词汇（复制 talkai_py 逻辑）
+        vocab_load_result = None
+        if grade_updated and new_grade:
+            try:
+                from app.services.vocab_loader import vocab_loader
+                logger.info(f"Auto-loading vocabulary for grade: {new_grade}")
+                
+                # 异步加载词汇，不阻塞响应
+                vocab_success = vocab_loader.load_vocab_by_grade(user_id, db)
+                if vocab_success:
+                    vocab_load_result = f"Vocabulary updated based on new learning level: {new_grade}"
+                    logger.info(f"Successfully loaded vocabulary for user {user_id}, grade: {new_grade}")
+                else:
+                    vocab_load_result = f"Vocabulary for {new_grade} already loaded or failed to load"
+                    logger.info(f"Vocabulary for {new_grade} was not loaded (might already exist)")
+                    
+            except Exception as e:
+                logger.error(f"Error loading vocabulary after profile update: {e}")
+                vocab_load_result = f"Failed to load vocabulary for {new_grade}"
+        
+        response = UserProfileResponse(
             id=user.id,
             nickname=user.nickname,
             avatar_url=user.avatar_url,
@@ -151,6 +184,13 @@ async def update_user_profile(
             is_active=user.is_active,
             is_premium=user.is_premium
         )
+        
+        # 如果有词汇加载结果，添加到响应中
+        if vocab_load_result:
+            # 可以通过 logger 记录，前端可以通过其他方式获取此信息
+            logger.info(f"Profile update completed with vocab result: {vocab_load_result}")
+        
+        return response
         
     except HTTPException:
         raise
@@ -308,3 +348,242 @@ async def delete_user_account(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete user account"
         )
+
+
+@router.get("/profile/grades")
+async def get_available_grades():
+    """
+    获取所有可用的学习等级列表
+    
+    返回支持的所有学习等级，用于前端 profile 编辑界面
+    """
+    try:
+        from app.services.vocab_loader import vocab_loader
+        
+        grades = vocab_loader.get_available_grades()
+        grade_info = []
+        
+        for grade in grades:
+            vocab_count = vocab_loader.get_vocab_count_by_grade(grade)
+            grade_info.append({
+                "grade": grade,
+                "vocab_count": vocab_count,
+                "description": f"{grade} level vocabulary ({vocab_count} words)"
+            })
+        
+        return {
+            "grades": grade_info,
+            "total_grades": len(grades)
+        }
+        
+    except Exception as e:
+        logger.error(f"Get available grades failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get available grades"
+        )
+
+
+@router.post("/profile/load-vocab")
+async def manually_load_vocab_by_grade(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    手动加载当前用户 grade 对应的词汇
+    
+    这个端点允许用户手动触发词汇加载，复制 talkai_py 的 monitor_profile_changes 功能
+    """
+    try:
+        user_id = current_user["sub"]
+        
+        from app.services.vocab_loader import vocab_loader
+        
+        success = vocab_loader.monitor_profile_changes(user_id, db)
+        
+        if success:
+            # 获取用户信息以显示加载的等级
+            user = db.query(User).filter(User.id == user_id).first()
+            grade = user.grade if user else "Unknown"
+            
+            return {
+                "success": True,
+                "message": f"Vocabulary loaded successfully for grade: {grade}",
+                "grade": grade
+            }
+        else:
+            return {
+                "success": False,
+                "message": "Vocabulary not loaded (might already exist or grade not set)",
+                "grade": None
+            }
+        
+    except Exception as e:
+        logger.error(f"Manually load vocab failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to load vocabulary"
+        )
+
+
+@router.get("/profile/vocab-status")
+async def get_vocab_status(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    获取用户词汇加载状态
+    
+    显示用户已加载的词汇等级和统计信息
+    """
+    try:
+        user_id = current_user["sub"]
+        
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        # 获取已加载的词汇等级
+        added_vocab_levels = user.added_vocab_levels or []
+        
+        # 获取词汇统计
+        from app.models.vocab import VocabItem
+        total_vocab = db.query(VocabItem).filter(
+            VocabItem.user_id == user_id,
+            VocabItem.is_active == True
+        ).count()
+        
+        mastered_vocab = db.query(VocabItem).filter(
+            VocabItem.user_id == user_id,
+            VocabItem.is_active == True,
+            VocabItem.is_mastered == True
+        ).count()
+        
+        # 获取各等级词汇数量
+        level_vocab_counts = {}
+        for level in added_vocab_levels:
+            count = db.query(VocabItem).filter(
+                VocabItem.user_id == user_id,
+                VocabItem.level == level,
+                VocabItem.is_active == True
+            ).count()
+            level_vocab_counts[level] = count
+        
+        return {
+            "current_grade": user.grade,
+            "added_vocab_levels": added_vocab_levels,
+            "total_vocab_count": total_vocab,
+            "mastered_vocab_count": mastered_vocab,
+            "unmastered_vocab_count": total_vocab - mastered_vocab,
+            "mastery_percentage": (mastered_vocab / total_vocab * 100) if total_vocab > 0 else 0,
+            "level_vocab_counts": level_vocab_counts
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get vocab status failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get vocabulary status"
+        )
+
+
+@router.post("/debug/create-test-user")
+async def create_test_user(
+    db: Session = Depends(get_db)
+):
+    """
+    创建开发者测试用户
+    仅用于开发调试，生产环境应移除
+    """
+    try:
+        import uuid
+        
+        test_user_id = f"dev_user_{uuid.uuid4().hex[:8]}"
+        test_openid = f"test_openid_{uuid.uuid4().hex[:8]}"
+        
+        # 创建测试用户
+        from datetime import datetime
+        test_user = User(
+            id=test_user_id,
+            openid=test_openid,
+            nickname="开发者测试用户",
+            avatar_url="/images/default_avatar.png",
+            age=25,
+            gender="Male",
+            grade="Primary School",  # 默认等级
+            added_vocab_levels=[],
+            created_at=datetime.utcnow(),
+            last_login_at=datetime.utcnow(),
+            total_usage_time=0,
+            chat_history_count=0,
+            preferred_ai_model="moonshot-v1-8k",
+            vocab_sync_interval=24,
+            is_active=True,
+            is_premium=False
+        )
+        
+        db.add(test_user)
+        db.commit()
+        db.refresh(test_user)
+        
+        logger.info(f"[DEBUG] 创建测试用户: {test_user_id}")
+        
+        # 自动初始化词汇库
+        from app.services.vocab_loader import vocab_loader
+        logger.info(f"为测试用户 {test_user_id} 初始化词汇库 (grade: {test_user.grade})")
+        vocab_success = vocab_loader.load_vocab_by_grade(test_user_id, db)
+        
+        # 检查加载结果
+        from app.models.vocab import VocabItem
+        vocab_count = db.query(VocabItem).filter(
+            VocabItem.user_id == test_user_id,
+            VocabItem.is_active == True
+        ).count()
+        
+        # 获取词汇示例
+        sample_vocabs = db.query(VocabItem).filter(
+            VocabItem.user_id == test_user_id,
+            VocabItem.is_active == True
+        ).limit(5).all()
+        
+        vocab_examples = [
+            {
+                "word": v.word,
+                "level": v.level,
+                "source": v.source
+            }
+            for v in sample_vocabs
+        ]
+        
+        # 生成测试用的JWT token
+        from app.api.v1.auth import create_access_token
+        token_data = {
+            "sub": test_user_id,
+            "openid": test_openid,
+            "type": "access_token"
+        }
+        access_token = create_access_token(data=token_data)
+
+        return {
+            "success": True,
+            "user_id": test_user_id,
+            "openid": test_openid,
+            "grade": test_user.grade,
+            "vocab_initialized": vocab_success,
+            "vocab_count": vocab_count,
+            "vocab_examples": vocab_examples,
+            "access_token": access_token,
+            "token_type": "bearer",
+            "message": f"测试用户创建成功，词汇库初始化{'成功' if vocab_success else '失败'}"
+        }
+        
+    except Exception as e:
+        logger.error(f"Create test user failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"error": str(e)}
