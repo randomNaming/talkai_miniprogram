@@ -33,6 +33,16 @@ Page({
   onShow: function () {
     // Check authentication before loading data
     this.checkAuthAndLoadData();
+    
+    // 检查是否需要刷新词汇状态数据
+    const needsRefresh = wx.getStorageSync('vocab_status_needs_refresh');
+    if (needsRefresh) {
+      console.log('Vocabulary status refresh triggered from other pages');
+      wx.removeStorageSync('vocab_status_needs_refresh');
+      
+      // 重新加载词汇状态数据
+      this.loadVocabStatus();
+    }
   },
 
   checkAuthAndLoadData: function() {

@@ -30,6 +30,27 @@
   - 简单词过滤：过滤掉简单词汇，避免统计无意义的词汇
   - 完整的异步处理：支持异步词汇更新，不阻塞用户对话
 
+后端使用SQLite数据库存储词汇，而talkai_py使用JSON文件
+
+  talkai_py JSON格式 ↔ 后端数据库格式:
+  - word ↔ word
+  - source ↔ source
+  - level ↔ level
+  - added_date ↔ created_at
+  - last_used ↔ last_reviewed
+  - wrong_use_count ↔ encounter_count - correct_count
+  - right_use_count ↔ correct_count
+  - isMastered ↔ is_mastered
+
+    - 数据库查询确认包含不同来源的词汇：
+    - lookup - 词典查询添加
+    - wrong_use - AI改错添加
+    - level_vocab - 等级词汇初始化
+
+  词汇数据库位置和格式
+
+  数据库位置：/Users/pean/aiproject/talkai_mini/backend/data/db/talkai.db
+
 
    1.关于UI输出逻辑，不用等到自然AI回复、AI改错、词汇推荐一起输出，而是分线程独立输出，目的  │
 │   是减少用户等待输出的时间，可参考talkai_py/ui.py中的class                                  │

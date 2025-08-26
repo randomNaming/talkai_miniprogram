@@ -87,19 +87,23 @@ async def query_word(
         )
 
 
-@router.get("/lookup")
-async def lookup_word_simple(
+@router.post("/lookup")
+async def lookup_word_with_vocab(
     word: str = Query(..., description="Word to lookup and add to vocabulary"),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    词典查询并模拟添加到词汇管理器（不需要认证的简化版本）
-    复制 talkai_py 中的 handle_word_lookup 逻辑
+    词典查询并真正添加到词汇管理器
+    完全复制 talkai_py 中的 handle_word_lookup 逻辑
     
-    - 如果是中文输入，不添加到词汇管理器；如果是英文输入，则模拟添加
+    - 如果是中文输入，不添加到词汇管理器；如果是英文输入，则真正添加
     - 支持中英文双向查询
+    - 调用 vocabulary_service._update_learning_vocab_async(word, "lookup")
     """
     try:
+        from app.services.vocabulary import vocabulary_service
+        
         if not word or not word.strip():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -107,6 +111,7 @@ async def lookup_word_simple(
             )
         
         word = word.strip()
+        user_id = current_user["sub"]
         
         # 获取单词定义
         result = dictionary_service.query_word(word, fuzzy=False)
@@ -127,15 +132,109 @@ async def lookup_word_simple(
         added_to_vocab = False
         vocab_message = ""
         
-        # 如果是中文输入，不添加到词汇管理器；如果是英文输入，则模拟添加
+        # 如果是中文输入，不添加到词汇管理器；如果是英文输入，则真正添加 
+        # 复制 talkai_py/ui.py:654-659 逻辑
         if not has_chinese(word):
-            # 模拟成功添加（实际应用中需要用户认证和真实的词汇管理）
-            added_to_vocab = True
-            vocab_message = f"✓ Added vocabulary: '{word}' to learning list."
-            logger.info(f"Simulated adding English word '{word}' to vocabulary (source: lookup)")
+            try:
+                # 调用真正的词汇管理服务，复制 talkai_py 的 update_learning_vocab_async(word, "lookup")
+                success = await vocabulary_service._update_learning_vocab_async(
+                    user_id=user_id,
+                    word=word,
+                    source="lookup",
+                    db=db
+                )
+                if success:
+                    added_to_vocab = True
+                    vocab_message = f"✓ Added vocabulary: '{word}' to learning list."
+                    logger.info(f"Successfully added English word '{word}' to vocabulary (user: {user_id}, source: lookup)")
+                else:
+                    vocab_message = f"✗ Failed to add vocabulary: '{word}'."
+                    logger.error(f"Failed to add word '{word}' to vocabulary for user {user_id}")
+            except Exception as e:
+                logger.error(f"Failed to add word to vocabulary: {e}")
+                vocab_message = f"✗ Failed to add vocabulary: '{word}'."
         else:
             vocab_message = "Chinese input - not added to vocabulary manager."
             logger.info(f"Chinese input '{word}' not added to vocabulary manager")
+        
+        return {
+            "word": word,
+            "definition": result,
+            "added_to_vocab": added_to_vocab,
+            "message": vocab_message
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Word lookup failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Word lookup failed"
+        )
+
+
+@router.get("/lookup-simple")
+async def lookup_word_simple(
+    word: str = Query(..., description="Word to lookup and add to vocabulary (no auth)"),
+    db: Session = Depends(get_db)
+):
+    """
+    词典查询并添加到词汇库的简化版本（用于测试，不需要认证）
+    使用默认用户ID
+    """
+    try:
+        from app.services.vocabulary import vocabulary_service
+        
+        if not word or not word.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Word parameter is required"
+            )
+        
+        word = word.strip()
+        # 使用默认用户ID（从现有数据库中获取）
+        default_user_id = "3ed4291004c12c2a"  
+        
+        # 获取单词定义
+        result = dictionary_service.query_word(word, fuzzy=False)
+        
+        if not result:
+            return {
+                "word": word,
+                "definition": f"未找到单词 '{word}' 的定义",
+                "added_to_vocab": False,
+                "message": f"Word '{word}' not found in dictionary"
+            }
+        
+        # 检查是否包含中文字符
+        def has_chinese(text: str) -> bool:
+            import re
+            return bool(re.search(r'[\u4e00-\u9fff]', text))
+        
+        added_to_vocab = False
+        vocab_message = ""
+        
+        # 如果是英文输入，添加到词汇管理器
+        if not has_chinese(word):
+            try:
+                success = await vocabulary_service._update_learning_vocab_async(
+                    user_id=default_user_id,
+                    word=word,
+                    source="lookup",
+                    db=db
+                )
+                if success:
+                    added_to_vocab = True
+                    vocab_message = f"✓ Added vocabulary: '{word}' to learning list."
+                    logger.info(f"Successfully added English word '{word}' to vocabulary (source: lookup)")
+                else:
+                    vocab_message = f"✗ Failed to add vocabulary: '{word}'."
+            except Exception as e:
+                logger.error(f"Failed to add word to vocabulary: {e}")
+                vocab_message = f"✗ Failed to add vocabulary: '{word}'."
+        else:
+            vocab_message = "Chinese input - not added to vocabulary manager."
         
         return {
             "word": word,

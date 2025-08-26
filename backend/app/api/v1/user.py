@@ -350,6 +350,44 @@ async def delete_user_account(
         )
 
 
+@router.get("/profile/vocab-status-simple")
+async def get_vocab_status_simple(
+    db: Session = Depends(get_db)
+):
+    """
+    获取词汇状态（简化版本，用于测试，使用默认用户）
+    """
+    try:
+        # 使用默认用户ID
+        default_user_id = "3ed4291004c12c2a"
+        
+        from app.models.vocab import VocabItem
+        total_vocab = db.query(VocabItem).filter(
+            VocabItem.user_id == default_user_id,
+            VocabItem.is_active == True
+        ).count()
+        
+        mastered_vocab = db.query(VocabItem).filter(
+            VocabItem.user_id == default_user_id,
+            VocabItem.is_active == True,
+            VocabItem.is_mastered == True
+        ).count()
+        
+        return {
+            "total_vocab_count": total_vocab,
+            "mastered_vocab_count": mastered_vocab,
+            "unmastered_vocab_count": total_vocab - mastered_vocab,
+            "mastery_percentage": (mastered_vocab / total_vocab * 100) if total_vocab > 0 else 0
+        }
+        
+    except Exception as e:
+        logger.error(f"Get vocab status simple failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get vocabulary status"
+        )
+
+
 @router.get("/profile/grades")
 async def get_available_grades():
     """

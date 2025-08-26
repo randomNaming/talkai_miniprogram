@@ -207,20 +207,17 @@ async def _send_message_complete(
     db: Session
 ) -> ChatResponse:
     """
-    Send a message and get AI response with grammar correction
+    Send a message and get IMMEDIATE AI response only (like talkai_py pattern)
     
-    Following talkai_py pattern:
-    1. FIRST: Generate AI dialogue response using conversation memory (fast response to UI)
-    2. SECOND: Check grammar/correction in parallel (separate AI call, different prompt)
-    3. THIRD: Generate vocabulary suggestions based on conversation context
+    Following talkai_py MessageProcessingThread pattern:
+    1. IMMEDIATE: Generate and return AI dialogue response only
+    2. Grammar correction and vocabulary suggestions will be called separately by frontend
     
-    Key differences from previous implementation:
-    - AI dialogue and grammar correction are separate AI model calls
-    - Only natural conversation is saved in memory (not corrections)
-    - Faster response by immediately returning dialogue, processing corrections async
+    This enables true progressive display like talkai_py where:
+    - AI response shows immediately (~1s)
+    - Grammar correction shows separately (~1s later) 
+    - Vocabulary suggestions show separately (~1s later)
     """
-    import asyncio
-    
     try:
         user_id = current_user["sub"]
         user_input = chat_request.message.strip()
@@ -247,56 +244,23 @@ async def _send_message_complete(
             "preferred_ai_model": user.preferred_ai_model
         }
         
-        # STEP 1: IMMEDIATE AI DIALOGUE RESPONSE (using conversation memory)
-        # This uses LangChain ConversationBufferWindowMemory and saves to memory
-        logger.info(f"Step 1: Generating natural dialogue response for user {user_id}")
+        # STEP 1: IMMEDIATE AI DIALOGUE RESPONSE ONLY
+        # Just like talkai_py - return AI response immediately, everything else is separate
+        logger.info(f"Immediate AI response for user {user_id}")
         response_result = ai_service.generate_response_natural(
             user_input=user_input,
             user_profile=user_profile,
-            user_id=user_id  # This will use user-specific memory
+            user_id=user_id
         )
         ai_response = response_result.get("text", "")
         
-        # STEP 2 & 3: PARALLEL PROCESSING (grammar check + vocabulary suggestions)
-        # These run separately and don't affect conversation memory
-        logger.info(f"Step 2&3: Starting parallel grammar check and vocabulary suggestions")
-        
-        async def grammar_check_task():
-            """Separate grammar check task - does NOT affect conversation memory"""
-            return ai_service.check_vocab_from_input(user_input)  # Different AI call, different prompt
-        
-        async def vocab_suggestion_task():
-            """Vocabulary suggestion task based on conversation context"""
-            return await ai_service.suggest_vocabulary(
-                user_id=user_id,
-                user_input=user_input,
-                ai_response=ai_response,
-                db=db
-            )
-        
-        # Run grammar check and vocabulary suggestions in parallel
-        grammar_result, suggested_vocab = await asyncio.gather(
-            grammar_check_task(),
-            vocab_suggestion_task(),
-            return_exceptions=True
-        )
-        
-        # Handle potential exceptions from parallel tasks
-        if isinstance(grammar_result, Exception):
-            logger.error(f"Grammar check failed: {grammar_result}")
-            grammar_result = {"corrected_input": None, "words_deserve_to_learn": []}
-        
-        if isinstance(suggested_vocab, Exception):
-            logger.error(f"Vocabulary suggestion failed: {suggested_vocab}")
-            suggested_vocab = []
-        
-        # STEP 4: SAVE CHAT RECORD (only natural conversation, not corrections)
+        # STEP 2: SAVE CHAT RECORD (basic record, no corrections yet)
         chat_record = ChatRecord(
             user_id=user_id,
             user_input=user_input,
-            ai_correction=grammar_result.get("corrected_input") if grammar_result.get("has_error") else None,
-            correction_type="grammar" if grammar_result.get("has_error") else None,
-            grammar_errors=grammar_result.get("vocab_to_learn", []),
+            ai_correction=None,  # Will be updated later if needed
+            correction_type=None,
+            grammar_errors=[],
             difficulty_score=0.5,
             conversation_context="general",
             is_processed=False
@@ -306,45 +270,14 @@ async def _send_message_complete(
         user.chat_history_count = (user.chat_history_count or 0) + 1
         db.commit()
         
-        # STEP 5: PREPARE RESPONSE FORMAT
-        grammar_check = None
-        corrected_input = grammar_result.get("corrected_input")
-        words_deserve_to_learn = grammar_result.get("words_deserve_to_learn", [])
+        logger.info(f"Immediate AI response completed for user {user_id}: {len(ai_response)} chars")
         
-        # Only show correction if corrected_input exists AND is different from user input
-        if corrected_input and corrected_input != user_input:
-            vocab_items = []
-            for item in words_deserve_to_learn:
-                vocab_items.append(VocabItem(
-                    original=item.get("original", ""),
-                    corrected=item.get("corrected", ""),
-                    explanation=item.get("explanation", "")
-                ))
-            
-            grammar_check = GrammarCheckResult(
-                corrected_input=corrected_input,
-                has_error=True,
-                vocab_to_learn=vocab_items
-            )
-        
-        # STEP 6: ASYNCHRONOUS VOCABULARY DATABASE UPDATE (background task)
-        if grammar_result.get("corrected_input") is not None:
-            # Run in background - don't wait for this
-            asyncio.create_task(
-                ai_service.update_vocabulary_from_correction(
-                    grammar_result=grammar_result,
-                    user_input=user_input,
-                    user_id=user_id,
-                    db=db
-                )
-            )
-        
-        logger.info(f"Chat response completed for user {user_id}: dialogue={len(ai_response)} chars, corrections={len(words_deserve_to_learn)}, vocab_suggestions={len(suggested_vocab or [])}")
-        
+        # Return ONLY AI response - no grammar check, no vocab suggestions
+        # Frontend will call separate endpoints for those
         return ChatResponse(
             response=ai_response,
-            grammar_check=grammar_check,
-            suggested_vocab=suggested_vocab or []
+            grammar_check=None,
+            suggested_vocab=[]
         )
         
     except HTTPException:
@@ -417,12 +350,14 @@ async def get_conversation_history(
 @router.post("/grammar-check", response_model=GrammarCheckResult)
 async def check_grammar_only(
     request: dict,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
-    Check grammar and vocabulary without generating chat response
+    Check grammar and vocabulary for progressive display (like talkai_py correction_ready signal)
     
-    Useful for quick grammar checks without full conversation context.
+    This endpoint is called separately after AI response to provide grammar correction.
+    Implements the same logic as talkai_py MessageProcessingThread Step 3.
     """
     try:
         text = request.get("text", "").strip()
@@ -433,21 +368,40 @@ async def check_grammar_only(
                 detail="Text is required"
             )
         
-        # Check grammar and identify vocabulary
-        result = await ai_service.check_grammar_and_vocabulary(text)
+        user_id = current_user["sub"]
+        logger.info(f"Grammar check for user {user_id}: {text[:50]}...")
+        
+        # Use the same grammar check method as talkai_py
+        result = ai_service.check_vocab_from_input(text)
         
         # Format vocabulary items
         vocab_items = []
-        for item in result.get("vocab_to_learn", []):
+        words_deserve_to_learn = result.get("words_deserve_to_learn", [])
+        for item in words_deserve_to_learn:
             vocab_items.append(VocabItem(
                 original=item.get("original", ""),
                 corrected=item.get("corrected", ""),
                 explanation=item.get("explanation", "")
             ))
         
+        corrected_input = result.get("corrected_input")
+        has_error = corrected_input and corrected_input != text
+        
+        # Background vocabulary update (like talkai_py)
+        if has_error and result:
+            import asyncio
+            asyncio.create_task(
+                ai_service.update_vocabulary_from_correction(
+                    grammar_result=result,
+                    user_input=text,
+                    user_id=user_id,
+                    db=db
+                )
+            )
+        
         return GrammarCheckResult(
-            corrected_input=result.get("corrected_input", text),
-            has_error=result.get("has_error", False),
+            corrected_input=corrected_input or text,
+            has_error=has_error,
             vocab_to_learn=vocab_items
         )
         
@@ -458,6 +412,54 @@ async def check_grammar_only(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Grammar check failed"
+        )
+
+
+@router.post("/vocabulary-suggestions")
+async def get_vocabulary_suggestions(
+    request: dict,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get vocabulary suggestions for progressive display (like talkai_py vocabulary_ready signal)
+    
+    This endpoint is called separately after grammar check to provide vocabulary suggestions.
+    Implements the same logic as talkai_py MessageProcessingThread Step 4.
+    """
+    try:
+        user_input = request.get("user_input", "").strip()
+        ai_response = request.get("ai_response", "").strip()
+        
+        if not user_input:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="user_input is required"
+            )
+        
+        user_id = current_user["sub"]
+        logger.info(f"Vocabulary suggestions for user {user_id}")
+        
+        # Use the same vocabulary suggestion method as talkai_py
+        suggested_vocab = await ai_service.suggest_vocabulary(
+            user_id=user_id,
+            user_input=user_input,
+            ai_response=ai_response,
+            db=db
+        )
+        
+        return {
+            "suggested_vocab": suggested_vocab or [],
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Vocabulary suggestions failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Vocabulary suggestions failed"
         )
 
 
