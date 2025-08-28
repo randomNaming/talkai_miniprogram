@@ -4,7 +4,10 @@
     "pages/vocab/vocab",
     "pages/profile/profile",
     "pages/dict/dict",
-    "pages/login/login"
+    "pages/login/login",
+    "pages/test-sync/test-sync",
+    "pages/vocab/progress-view",
+    "pages/profile/test-connection"
   ],
   "window": {
     "backgroundTextStyle": "light",

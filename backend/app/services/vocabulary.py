@@ -508,42 +508,41 @@ class VocabularyService:
                 # 更新现有词汇
                 existing_vocab.last_used = datetime.utcnow()
                 
-                # 映射到数据库字段：right_use_count -> correct_count, wrong_use_count -> encounter_count - correct_count
+                # 使用talkai_py兼容的字段名：wrong_use_count, right_use_count
                 if source in ["user_input", "lookup", "wrong_use"]:  # 3 cases for wrong_use
-                    existing_vocab.encounter_count = (existing_vocab.encounter_count or 0) + 1
+                    existing_vocab.wrong_use_count = (existing_vocab.wrong_use_count or 0) + 1
                 elif source == "right_use":
-                    existing_vocab.correct_count = (existing_vocab.correct_count or 0) + 1
-                    existing_vocab.encounter_count = (existing_vocab.encounter_count or 0) + 1
+                    existing_vocab.right_use_count = (existing_vocab.right_use_count or 0) + 1
                 
-                # 计算掌握状态：right_use_count - wrong_use_count >= 3
-                right_count = existing_vocab.correct_count or 0
-                wrong_count = (existing_vocab.encounter_count or 0) - right_count
+                # 计算掌握状态：right_use_count - wrong_use_count >= 3 (talkai_py logic)
+                right_count = existing_vocab.right_use_count or 0
+                wrong_count = existing_vocab.wrong_use_count or 0
                 mastery_score = right_count - wrong_count
-                existing_vocab.is_mastered = mastery_score >= 3
+                existing_vocab.isMastered = mastery_score >= 3
                 
                 db.commit()
                 
                 logger.info(
                     f"更新词汇 {word} for user {user_id}: "
                     f"right={right_count}, wrong={wrong_count}, "
-                    f"mastered={existing_vocab.is_mastered}, source={source}"
+                    f"mastered={existing_vocab.isMastered}, source={source}"
                 )
                 
                 return True
             else:
                 # "right_use" will not add to learning_vocab.json
                 if source != "right_use":
-                    # 创建新词汇项
+                    # 创建新词汇项 (talkai_py兼容格式)
                     new_vocab = VocabItem(
                         user_id=user_id,
                         word=word,
                         source=source,
                         level="none",  # 动态添加的词汇标记为 "none"
-                        created_at=datetime.utcnow(),
-                        last_reviewed=datetime.utcnow(),
-                        correct_count=0,
-                        encounter_count=1 if source in ["user_input", "lookup", "wrong_use"] else 0,
-                        is_mastered=False,
+                        added_date=datetime.utcnow(),  # talkai_py: added_date
+                        last_used=datetime.utcnow(),   # talkai_py: last_used
+                        right_use_count=0,             # talkai_py: right_use_count
+                        wrong_use_count=1 if source in ["user_input", "lookup", "wrong_use"] else 0,  # talkai_py: wrong_use_count
+                        isMastered=False,              # talkai_py: isMastered
                         is_active=True
                     )
                     

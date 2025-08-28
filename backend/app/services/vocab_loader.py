@@ -29,6 +29,18 @@ class VocabLoader:
             "GRE": "GRE_all.txt"
         }
         
+        # JSON文件映射（作为备选）
+        self.grade_to_json_file = {
+            "Primary School": "primary_school_all.json",
+            "Middle School": "middle_school_all.json", 
+            "High School": "high_school_all.json",
+            "CET4": "CET4_all.json",
+            "CET6": "CET6_all.json",
+            "TOEFL": "TOEFL_all.json",
+            "IELTS": "IELTS_all.json",
+            "GRE": "GRE_all.json"
+        }
+        
         # 词汇文件路径
         self.level_words_dir = "data/level_words"
     
@@ -46,6 +58,19 @@ class VocabLoader:
         except Exception as e:
             logger.error(f"读取txt文件失败: {e}")
         return words
+    
+    def _read_json_vocab_items(self, json_file_path: str) -> List[Dict]:
+        """从JSON文件读取完整的词汇项（保持talkai_py格式）"""
+        vocab_items = []
+        try:
+            with open(json_file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    vocab_items = data
+                logger.info(f"从 {json_file_path} 读取到 {len(vocab_items)} 个词汇项")
+        except Exception as e:
+            logger.error(f"读取JSON文件失败: {e}")
+        return vocab_items
     
     def _load_current_vocab(self, user_id: str, db: Session) -> Dict:
         """加载当前用户的学习词汇，返回词汇字典和单词集合"""
@@ -67,12 +92,45 @@ class VocabLoader:
             word=word.lower(),
             source="level_vocab",
             level=grade,
-            encounter_count=1,
-            correct_count=0,
-            mastery_score=0.0,
-            is_mastered=False,
+            wrong_use_count=0,  # 使用talkai_py兼容字段名
+            right_use_count=0,  # 使用talkai_py兼容字段名
+            isMastered=False,   # 使用talkai_py兼容字段名
             is_active=True,
-            created_at=today,
+            added_date=today,   # 使用talkai_py兼容字段名
+            last_used=None,     # 使用talkai_py兼容字段名
+            updated_at=today
+        )
+    
+    def _create_word_entry_from_json(self, vocab_data: Dict, user_id: str) -> VocabItem:
+        """根据JSON数据创建词汇条目（保持talkai_py格式完整性）"""
+        today = datetime.utcnow()
+        
+        # 解析日期字符串
+        added_date = today
+        if vocab_data.get("added_date"):
+            try:
+                added_date = datetime.fromisoformat(vocab_data["added_date"])
+            except:
+                added_date = today
+        
+        last_used = None
+        if vocab_data.get("last_used"):
+            try:
+                last_used = datetime.fromisoformat(vocab_data["last_used"])
+            except:
+                last_used = None
+        
+        return VocabItem(
+            user_id=user_id,
+            word=vocab_data.get("word", "").lower(),
+            source=vocab_data.get("source", "level_vocab"),
+            level=vocab_data.get("level", ""),
+            wrong_use_count=vocab_data.get("wrong_use_count", 0),
+            right_use_count=vocab_data.get("right_use_count", 0),
+            isMastered=vocab_data.get("isMastered", False),
+            is_active=True,
+            added_date=added_date,
+            last_used=last_used,
             updated_at=today
         )
     
@@ -83,7 +141,7 @@ class VocabLoader:
         vocab_item.updated_at = datetime.utcnow()
     
     def load_vocab_by_grade(self, user_id: str, db: Session) -> bool:
-        """根据用户grade从txt文件加载对应词汇表（完全复制 talkai_py 逻辑）"""
+        """根据用户grade从JSON/txt文件加载对应词汇表（优先使用JSON格式保持talkai_py兼容性）"""
         try:
             # 获取用户资料
             user = db.query(User).filter(User.id == user_id).first()
@@ -109,23 +167,40 @@ class VocabLoader:
                 return False
             
             logger.info(f"用户 {user_id} 尚未加载 {grade} 级别词汇，开始加载...")
-                
-            # 获取对应txt文件名
-            txt_filename = self.grade_to_txt_file.get(grade)
-            if not txt_filename:
-                logger.error(f"不支持的grade级别: {grade}")
-                return False
-                
-            # 构建txt文件路径
-            txt_file_path = os.path.join(self.level_words_dir, txt_filename)
-            if not os.path.exists(txt_file_path):
-                logger.error(f"文件不存在: {txt_file_path}")
-                return False
-                
-            # 从txt文件读取词汇
-            words_from_txt = self._read_txt_words(txt_file_path)
-            if not words_from_txt:
-                logger.error(f"从 {txt_filename} 中未读取到有效词汇")
+            
+            # 优先尝试JSON格式（保持talkai_py完整结构）
+            json_filename = self.grade_to_json_file.get(grade)
+            vocab_items = []
+            
+            if json_filename:
+                json_file_path = os.path.join(self.level_words_dir, json_filename)
+                if os.path.exists(json_file_path):
+                    logger.info(f"使用JSON格式文件: {json_filename}")
+                    vocab_items = self._read_json_vocab_items(json_file_path)
+            
+            # 如果JSON失败，回退到TXT格式
+            if not vocab_items:
+                txt_filename = self.grade_to_txt_file.get(grade)
+                if not txt_filename:
+                    logger.error(f"不支持的grade级别: {grade}")
+                    return False
+                    
+                txt_file_path = os.path.join(self.level_words_dir, txt_filename)
+                if not os.path.exists(txt_file_path):
+                    logger.error(f"文件不存在: {txt_file_path}")
+                    return False
+                    
+                logger.info(f"使用TXT格式文件: {txt_filename}")
+                words_from_txt = self._read_txt_words(txt_file_path)
+                if words_from_txt:
+                    # 转换为词汇项格式
+                    vocab_items = [{"word": word, "source": "level_vocab", "level": grade, 
+                                  "wrong_use_count": 0, "right_use_count": 0, "isMastered": False,
+                                  "added_date": datetime.utcnow().isoformat(), "last_used": ""}
+                                 for word in words_from_txt]
+            
+            if not vocab_items:
+                logger.error(f"未能读取到有效词汇数据")
                 return False
             
             # 加载当前学习词汇
@@ -135,14 +210,18 @@ class VocabLoader:
             updated_count = 0
             added_count = 0
             
-            for word in words_from_txt:
+            for vocab_data in vocab_items:
+                word = vocab_data.get("word", "").lower()
+                if not word:
+                    continue
+                    
                 if word in existing_words:
                     # 更新已存在的词汇
                     self._update_existing_word(vocab_dict[word], grade)
                     updated_count += 1
                 else:
-                    # 添加新词汇
-                    new_entry = self._create_word_entry(word, grade, user_id)
+                    # 添加新词汇（保持JSON格式的完整信息）
+                    new_entry = self._create_word_entry_from_json(vocab_data, user_id)
                     db.add(new_entry)
                     added_count += 1
             

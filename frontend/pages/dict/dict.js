@@ -141,9 +141,11 @@ Page({
             word: word,
             source: 'lookup',
             level: 'none',
-            encounter_count: 1,
-            correct_count: 0,
-            is_mastered: false,
+            wrong_use_count: 1,      // talkai_py兼容字段名
+            right_use_count: 0,      // talkai_py兼容字段名
+            isMastered: false,       // talkai_py兼容字段名
+            added_date: new Date().toISOString(),  // talkai_py兼容字段名
+            last_used: new Date().toISOString(),   // talkai_py兼容字段名
             definition: result.definition || ''
           });
           

@@ -1,0 +1,8 @@
+{
+  "navigationBarTitleText": "学习进度",
+  "backgroundColor": "#667eea",
+  "navigationBarBackgroundColor": "#667eea",
+  "navigationBarTextStyle": "white",
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "light"
+}

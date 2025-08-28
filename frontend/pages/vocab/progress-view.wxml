@@ -1,0 +1,105 @@
+<!-- 词汇学习进度详情页面 -->
+<view class="progress-container">
+  <!-- 标题 -->
+  <view class="header">
+    <text class="title">学习进度</text>
+  </view>
+
+  <!-- 基本统计卡片 -->
+  <view class="stats-card">
+    <view class="stats-row">
+      <view class="stat-item">
+        <text class="stat-number">{{basicStats.total_vocab_count || 0}}</text>
+        <text class="stat-label">总词汇</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-number">{{basicStats.mastered_vocab_count || 0}}</text>
+        <text class="stat-label">已掌握</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-number">{{basicStats.unmastered_vocab_count || 0}}</text>
+        <text class="stat-label">学习中</text>
+      </view>
+    </view>
+    
+    <!-- 掌握度进度条 -->
+    <view class="mastery-progress">
+      <view class="progress-header">
+        <text class="progress-title">掌握度</text>
+        <text class="progress-percent">{{basicStats.mastery_percentage || 0}}%</text>
+      </view>
+      <view class="progress-bar">
+        <view class="progress-fill" style="width: {{(basicStats.mastery_percentage || 0) + '%'}}"></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 本月统计卡片 -->
+  <view class="monthly-card">
+    <text class="card-title">{{monthlyStats.month_name || '本月统计'}}</text>
+    <view class="monthly-stats">
+      <view class="monthly-item">
+        <text class="monthly-number">{{monthlyStats.newWords || 0}}</text>
+        <text class="monthly-label">新学词汇</text>
+      </view>
+      <view class="monthly-item">
+        <text class="monthly-number">{{monthlyStats.reviewWords || 0}}</text>
+        <text class="monthly-label">复习次数</text>
+      </view>
+      <view class="monthly-item">
+        <text class="monthly-number">{{monthlyStats.masteredWords || 0}}</text>
+        <text class="monthly-label">新掌握</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 7天学习趋势 -->
+  <view class="weekly-card">
+    <text class="card-title">7天学习趋势</text>
+    <view class="chart-container">
+      <view class="chart-area">
+        <!-- 简单的条形图 -->
+        <view class="chart-bars">
+          <view 
+            wx:for="{{weeklyProgress}}" 
+            wx:key="date" 
+            class="bar-group"
+          >
+            <view class="bar-container">
+              <!-- 新学词汇条 -->
+              <view 
+                class="bar new-words-bar" 
+                style="height: {{getBarHeight(item.new_words, maxNewWords) + '%'}}"
+              ></view>
+              <!-- 掌握词汇条 -->
+              <view 
+                class="bar mastered-words-bar" 
+                style="height: {{getBarHeight(item.mastered_words, maxMasteredWords) + '%'}}"
+              ></view>
+            </view>
+            <text class="bar-label">{{item.day_name}}</text>
+          </view>
+        </view>
+        
+        <!-- 图例 -->
+        <view class="legend">
+          <view class="legend-item">
+            <view class="legend-color new-words"></view>
+            <text class="legend-text">新学词汇</text>
+          </view>
+          <view class="legend-item">
+            <view class="legend-color mastered-words"></view>
+            <text class="legend-text">新掌握</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 刷新按钮 -->
+  <view class="actions">
+    <button class="refresh-btn" bindtap="refreshProgress" disabled="{{isLoading}}">
+      {{isLoading ? '加载中...' : '刷新数据'}}
+    </button>
+  </view>
+</view>

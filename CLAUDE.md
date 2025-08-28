@@ -1,11 +1,13 @@
 # CLAUDE.md
+## 目的：将desktop版本 的talkai_py 代码转换为微信小程序版本talkai_mini. 要尽最大可能保持talkai_py 原来的命名规则，逻辑，功能。
 ## 在每个代码文件开头详细注释本文件的代码逻辑。
-## 请将每次在claude code 输入提示词追加到CLAUDE_HISTORY.md， 并标注时间。
+## 请将每次在claude code 输入提示词以及完成的结果总结追加(不是覆盖)到CLAUDE_HISTORY.md， 并标注日期和时间（到分钟）。
 
 ## 本地开发
  请激活虚拟开发环境
   source /Users/pean/aiproject/talkai_mini/talkai_py/bookvidenv_new/bin/activate
  启动后端
+ lsof -ti:8000
   cd /Users/pean/aiproject/talkai_mini/backend
   uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
@@ -16,7 +18,7 @@
 ## 部署请参考 deploy_problem.md 中的 “快速部署指南”
 ## Project Overview
 
-TalkAI is a WeChat Mini Program for AI-powered English learning, featuring intelligent conversation practice, grammar correction, vocabulary management, and dictionary lookup. It consists of a Python FastAPI backend and WeChat Mini Program frontend.
+talkai_mini is a WeChat Mini Program for AI-powered English learning, featuring intelligent conversation practice, grammar correction, vocabulary management, and dictionary lookup. It consists of a Python FastAPI backend and WeChat Mini Program frontend.
 
 ## Architecture
 
@@ -33,7 +35,7 @@ TalkAI is a WeChat Mini Program for AI-powered English learning, featuring intel
 - `frontend/utils/storage.js` - Local storage utilities
 
 **Data:**
-- SQLite primary database at `backend/data/db/talkai.db`
+<!-- - SQLite primary database at `backend/data/db/talkai.db` -->
 - Dictionary database at `backend/data/db/dictionary400k.db` (400K words)
 - Redis cache for performance optimization
 

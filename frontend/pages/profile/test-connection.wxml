@@ -1,0 +1,43 @@
+<!-- 测试连接页面 -->
+<view class="container">
+  <view class="header">
+    <text class="title">前后端连接测试</text>
+  </view>
+
+  <view class="test-buttons">
+    <button class="test-btn" bindtap="testBasicConnection" disabled="{{isLoading}}">
+      测试基础连接
+    </button>
+    
+    <button class="test-btn" bindtap="testAPIWrapper" disabled="{{isLoading}}">
+      测试API封装
+    </button>
+    
+    <button class="test-btn" bindtap="testAuthentication" disabled="{{isLoading}}">
+      测试认证
+    </button>
+    
+    <button class="test-btn primary" bindtap="testProfileUpdate" disabled="{{isLoading}}">
+      测试个人资料更新
+    </button>
+    
+    <button class="test-btn secondary" bindtap="clearResults">
+      清空结果
+    </button>
+  </view>
+
+  <view class="results-section">
+    <text class="section-title">测试结果</text>
+    <scroll-view class="results-container" scroll-y="true">
+      <view wx:if="{{testResults.length === 0}}" class="empty-state">
+        <text>暂无测试结果</text>
+      </view>
+      <view wx:else class="results-list">
+        <view wx:for="{{testResults}}" wx:key="index" class="result-item">
+          <text class="result-message">{{item.message}}</text>
+          <text class="result-time">{{item.timestamp}}</text>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+</view>

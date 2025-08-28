@@ -229,6 +229,16 @@ const user = {
       url: '/user/profile/vocab-status',
       method: 'GET'
     });
+  },
+  
+  /**
+   * Get learning progress data
+   */
+  getLearningProgress() {
+    return request({
+      url: '/user/profile/learning-progress',
+      method: 'GET'
+    });
   }
 };
 
@@ -423,6 +433,36 @@ const sync = {
       url: '/sync/force-download',
       method: 'POST'
     });
+  },
+
+  /**
+   * 获取完整词汇列表（实时同步）
+   */
+  getVocabList() {
+    return request({
+      url: '/user/vocab-list-simple',
+      method: 'GET'
+    });
+  },
+
+  /**
+   * 获取词汇统计状态（实时同步）
+   */
+  getVocabStatus() {
+    return request({
+      url: '/user/profile/vocab-status-simple',
+      method: 'GET'
+    });
+  },
+
+  /**
+   * 强制刷新用户词汇缓存
+   */
+  forceRefreshVocab() {
+    return request({
+      url: '/user/refresh-vocab-cache',
+      method: 'POST'
+    });
   }
 };
 
@@ -457,6 +497,23 @@ function syncVocabulary(vocabData) {
   return sync.vocabulary(vocabData);
 }
 
+// 新增实时词汇同步方法
+function getVocabList() {
+  return sync.getVocabList();
+}
+
+function getVocabStatus() {
+  return sync.getVocabStatus();
+}
+
+function getLearningProgress() {
+  return user.getLearningProgress();
+}
+
+function forceRefreshVocab() {
+  return sync.forceRefreshVocab();
+}
+
 function updateUsageTime(sessionData) {
   return user.updateUsageTime(sessionData);
 }
@@ -480,6 +537,10 @@ module.exports = {
   addVocabWord,
   searchDict,
   syncVocabulary,
+  getLearningProgress,
+  getVocabList,
+  getVocabStatus,
+  forceRefreshVocab,
   updateUsageTime,
   
   // Config

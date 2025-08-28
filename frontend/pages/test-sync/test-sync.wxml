@@ -1,0 +1,74 @@
+<!-- 词汇同步测试页面 -->
+<view class="container">
+  <!-- 页面标题 -->
+  <view class="header">
+    <text class="title">词汇同步测试</text>
+  </view>
+
+  <!-- 同步状态信息 -->
+  <view class="status-section">
+    <text class="section-title">同步状态</text>
+    <view class="status-info">
+      <view class="status-item">
+        <text class="label">初始化状态:</text>
+        <text class="value {{syncStatus.isInitialized ? 'success' : 'error'}}">
+          {{syncStatus.isInitialized ? '已初始化' : '未初始化'}}
+        </text>
+      </view>
+      <view class="status-item">
+        <text class="label">同步进行中:</text>
+        <text class="value {{syncStatus.syncInProgress ? 'warning' : 'success'}}">
+          {{syncStatus.syncInProgress ? '是' : '否'}}
+        </text>
+      </view>
+      <view class="status-item">
+        <text class="label">上次同步:</text>
+        <text class="value">{{syncStatus.lastSyncTime ? '已同步' : '未同步'}}</text>
+      </view>
+      <view class="status-item">
+        <text class="label">重试次数:</text>
+        <text class="value">{{syncStatus.retryCount || 0}}</text>
+      </view>
+      <view class="status-item">
+        <text class="label">同步间隔:</text>
+        <text class="value">{{syncStatus.config ? (syncStatus.config.VOCAB_SYNC_INTERVAL / 1000) + '秒' : '未知'}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 测试按钮区域 -->
+  <view class="test-buttons">
+    <button class="btn primary" bindtap="runFullTest" disabled="{{isTestRunning}}">
+      {{isTestRunning ? '测试进行中...' : '运行完整测试'}}
+    </button>
+    
+    <view class="button-group">
+      <button class="btn secondary" bindtap="testAPIConnection">API连接</button>
+      <button class="btn secondary" bindtap="testVocabListAPI">词汇列表</button>
+    </view>
+    
+    <view class="button-group">
+      <button class="btn secondary" bindtap="testForceSync">强制同步</button>
+      <button class="btn secondary" bindtap="testVocabOperation">模拟操作</button>
+    </view>
+    
+    <button class="btn ghost" bindtap="updateSyncStatus">刷新状态</button>
+    <button class="btn ghost" bindtap="clearResults">清空结果</button>
+  </view>
+
+  <!-- 测试结果显示 -->
+  <view class="results-section">
+    <text class="section-title">测试结果</text>
+    <scroll-view class="results-container" scroll-y="true">
+      <view wx:if="{{testResults.length === 0}}" class="empty-state">
+        <text>暂无测试结果，点击上方按钮开始测试</text>
+      </view>
+      <view wx:else class="results-list">
+        <view wx:for="{{testResults}}" wx:key="index" class="result-item">
+          <text class="result-message">{{item.message}}</text>
+          <text class="result-time">{{item.timestamp}}</text>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+</view>

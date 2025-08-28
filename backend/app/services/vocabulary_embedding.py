@@ -46,7 +46,7 @@ class VocabularyEmbeddingService:
             unmastered_vocabs = db.query(VocabItem).filter(
                 VocabItem.user_id == user_id,
                 VocabItem.is_active == True,
-                VocabItem.is_mastered == False
+                VocabItem.isMastered == False  # 使用talkai_py兼容的字段名
             ).all()
             
             if not unmastered_vocabs:

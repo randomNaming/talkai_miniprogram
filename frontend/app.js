@@ -1,6 +1,7 @@
 // TalkAI Mini Program Entry Point
 const api = require('./services/api');
 const storage = require('./utils/storage');
+const { vocabSyncManager } = require('./services/vocab-sync');
 
 App({
   onLaunch: function () {
@@ -17,7 +18,9 @@ App({
       isLoggedIn: false,
       currentConversation: [],
       vocabList: [],
-      lastSyncTime: null
+      vocabStats: null,
+      lastSyncTime: null,
+      vocabSyncManager: vocabSyncManager
     };
     
     // Check login status
@@ -25,6 +28,9 @@ App({
     
     // Initialize services
     this.initServices();
+    
+    // Initialize vocabulary sync manager
+    this.initVocabSync();
   },
 
   setupErrorHandlers: function() {
@@ -42,6 +48,11 @@ App({
   onShow: function () {
     // App is brought to foreground
     console.log('App shown');
+    
+    // Trigger sync when app resumes from background
+    if (this.globalData.vocabSyncManager) {
+      this.globalData.vocabSyncManager.syncOnAppResume();
+    }
   },
 
   onHide: function () {
@@ -71,6 +82,67 @@ App({
     
     // Load conversation history
     this.loadConversationHistory();
+  },
+
+  // Initialize vocabulary sync manager
+  initVocabSync: function() {
+    try {
+      console.log('Initializing vocabulary sync manager');
+      
+      // Initialize the sync manager
+      this.globalData.vocabSyncManager.init();
+      
+      // Set up event listeners for vocab sync
+      this.setupVocabSyncEventListeners();
+      
+    } catch (error) {
+      console.error('Failed to initialize vocabulary sync:', error);
+    }
+  },
+
+  // Set up event listeners for vocabulary sync
+  setupVocabSyncEventListeners: function() {
+    // Store reference to app instance
+    const app = this;
+    
+    // Custom event emitter for vocab sync events
+    this.emitVocabSyncEvent = function(eventData) {
+      console.log('VocabSync Event:', eventData);
+      
+      // Handle different sync events
+      switch (eventData.type) {
+        case 'sync_success':
+          if (eventData.data && eventData.data.vocabulary) {
+            // Update pages that are currently showing vocab data
+            app.refreshVocabPages(eventData.data);
+          }
+          break;
+          
+        case 'sync_error':
+          console.error('Vocabulary sync error:', eventData.error);
+          break;
+      }
+    };
+  },
+
+  // Refresh pages that display vocabulary data
+  refreshVocabPages: function(vocabData) {
+    try {
+      // Get current pages stack
+      const pages = getCurrentPages();
+      const currentPage = pages[pages.length - 1];
+      
+      // Refresh vocab page if it's currently active
+      if (currentPage && currentPage.route === 'pages/vocab/vocab') {
+        if (typeof currentPage.loadVocabList === 'function') {
+          currentPage.loadVocabList();
+        }
+      }
+      
+      console.log('Vocabulary pages refreshed with new data');
+    } catch (error) {
+      console.error('Failed to refresh vocabulary pages:', error);
+    }
   },
 
   // Load cached vocabulary from local storage
@@ -177,6 +249,34 @@ App({
     storage.setVocabList(this.globalData.vocabList);
     
     console.log('Vocab word added/updated:', word.word);
+    
+    // Trigger cache refresh after vocabulary operation
+    if (this.globalData.vocabSyncManager) {
+      this.globalData.vocabSyncManager.refreshAfterVocabOperation('word_add');
+    }
+  },
+
+  // Helper method to trigger vocabulary sync after operations
+  triggerVocabSync: function(operation = 'unknown') {
+    if (this.globalData.vocabSyncManager) {
+      this.globalData.vocabSyncManager.refreshAfterVocabOperation(operation);
+    }
+  },
+
+  // Force vocabulary synchronization
+  forceVocabSync: function() {
+    if (this.globalData.vocabSyncManager) {
+      return this.globalData.vocabSyncManager.forceSync();
+    }
+    return Promise.resolve(false);
+  },
+
+  // Get vocabulary sync status
+  getVocabSyncStatus: function() {
+    if (this.globalData.vocabSyncManager) {
+      return this.globalData.vocabSyncManager.getSyncStatus();
+    }
+    return null;
   },
 
   // Sync data with server

@@ -15,6 +15,18 @@
       <text class="stats-item">总词汇: {{totalWords}}</text>
       <text class="stats-item">已掌握: {{masteredWords}}</text>
       <text class="stats-item">学习中: {{learningWords}}</text>
+      
+      <!-- 学习进度条 -->
+      <view class="progress-container" bindtap="goToProgressView">
+        <view class="progress-header">
+          <view class="progress-label">学习进度</view>
+          <text class="progress-text">{{progressPercentage}}%</text>
+          <text class="progress-arrow">></text>
+        </view>
+        <view class="progress-bar">
+          <view class="progress-fill" style="width: {{progressPercentage + '%'}}"></view>
+        </view>
+      </view>
     </view>
   </view>
 
@@ -40,8 +52,8 @@
       <view class="vocab-meaning">{{item.translation || item.definition}}</view>
       <view class="vocab-meta">
         <text class="vocab-source">{{item.source}}</text>
-        <view class="vocab-mastery {{item.is_mastered ? 'mastered' : 'learning'}}">
-          {{item.is_mastered ? '已掌握' : '学习中'}}
+        <view class="vocab-mastery {{item.isMastered ? 'mastered' : 'learning'}}">
+          {{item.isMastered ? '已掌握' : '学习中'}}
         </view>
       </view>
     </view>

@@ -1,3 +1,5 @@
 {
-  "navigationBarTitleText": "我的词汇"
+  "navigationBarTitleText": "我的词汇",
+  "enablePullDownRefresh": true,
+  "onReachBottomDistance": 50
 }

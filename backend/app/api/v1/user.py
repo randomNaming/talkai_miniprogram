@@ -147,25 +147,48 @@ async def update_user_profile(
         db.commit()
         db.refresh(user)
         
-        # 如果 grade 更新了，自动加载对应等级词汇（复制 talkai_py 逻辑）
+        # 如果 grade 更新了，清空词汇库并重新初始化（按照需求）
         vocab_load_result = None
         if grade_updated and new_grade:
             try:
                 from app.services.vocab_loader import vocab_loader
-                logger.info(f"Auto-loading vocabulary for grade: {new_grade}")
+                from app.models.vocab import VocabItem
                 
-                # 异步加载词汇，不阻塞响应
+                logger.info(f"Grade updated from '{old_grade}' to '{new_grade}', clearing and re-initializing vocabulary")
+                
+                # 1. 清空现有词汇库中的level_vocab类型词汇（保留lookup和wrong_use类型）
+                level_vocab_items = db.query(VocabItem).filter(
+                    VocabItem.user_id == user_id,
+                    VocabItem.source == "level_vocab",
+                    VocabItem.is_active == True
+                ).all()
+                
+                cleared_count = len(level_vocab_items)
+                for item in level_vocab_items:
+                    item.is_active = False  # 软删除
+                
+                logger.info(f"Cleared {cleared_count} level_vocab items")
+                
+                # 2. 清空added_vocab_levels记录
+                user.added_vocab_levels = []
+                
+                # 先提交清空操作
+                db.commit()
+                
+                # 3. 根据新grade初始化词汇库
                 vocab_success = vocab_loader.load_vocab_by_grade(user_id, db)
                 if vocab_success:
-                    vocab_load_result = f"Vocabulary updated based on new learning level: {new_grade}"
-                    logger.info(f"Successfully loaded vocabulary for user {user_id}, grade: {new_grade}")
+                    vocab_load_result = f"Vocabulary cleared and reinitialized for new grade: {new_grade}"
+                    logger.info(f"Successfully reinitialized vocabulary for user {user_id}, grade: {new_grade}")
                 else:
-                    vocab_load_result = f"Vocabulary for {new_grade} already loaded or failed to load"
-                    logger.info(f"Vocabulary for {new_grade} was not loaded (might already exist)")
+                    vocab_load_result = f"Vocabulary cleared but failed to load for {new_grade}"
+                    logger.warning(f"Vocabulary for {new_grade} failed to load after clearing")
                     
             except Exception as e:
-                logger.error(f"Error loading vocabulary after profile update: {e}")
-                vocab_load_result = f"Failed to load vocabulary for {new_grade}"
+                logger.error(f"Error handling vocabulary during profile update: {e}")
+                vocab_load_result = f"Failed to handle vocabulary update for {new_grade}"
+                db.rollback()
+                raise
         
         response = UserProfileResponse(
             id=user.id,
@@ -370,7 +393,7 @@ async def get_vocab_status_simple(
         mastered_vocab = db.query(VocabItem).filter(
             VocabItem.user_id == default_user_id,
             VocabItem.is_active == True,
-            VocabItem.is_mastered == True
+            VocabItem.isMastered == True  # 使用talkai_py兼容字段名
         ).count()
         
         return {
@@ -385,6 +408,220 @@ async def get_vocab_status_simple(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get vocabulary status"
+        )
+
+
+@router.get("/profile/learning-progress")
+async def get_learning_progress(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    获取学习进度数据，包括每日/每周/每月统计
+    """
+    try:
+        user_id = current_user["sub"]
+        
+        from app.models.vocab import VocabItem
+        from datetime import datetime, timedelta
+        from sqlalchemy import func, and_
+        
+        # 获取基本词汇统计
+        total_vocab = db.query(VocabItem).filter(
+            VocabItem.user_id == user_id,
+            VocabItem.is_active == True
+        ).count()
+        
+        mastered_vocab = db.query(VocabItem).filter(
+            VocabItem.user_id == user_id,
+            VocabItem.is_active == True,
+            VocabItem.isMastered == True
+        ).count()
+        
+        # 获取最近7天的学习进度
+        now = datetime.utcnow()
+        weekly_progress = []
+        
+        for i in range(7):
+            day_start = now - timedelta(days=i+1)
+            day_end = now - timedelta(days=i)
+            
+            # 统计当天添加的新词汇
+            new_words = db.query(VocabItem).filter(
+                VocabItem.user_id == user_id,
+                VocabItem.is_active == True,
+                VocabItem.added_date >= day_start,
+                VocabItem.added_date < day_end
+            ).count()
+            
+            # 统计当天掌握的词汇（假设通过last_used时间判断）
+            mastered_today = db.query(VocabItem).filter(
+                VocabItem.user_id == user_id,
+                VocabItem.is_active == True,
+                VocabItem.isMastered == True,
+                VocabItem.last_used >= day_start,
+                VocabItem.last_used < day_end
+            ).count()
+            
+            weekly_progress.append({
+                "date": day_start.strftime("%Y-%m-%d"),
+                "new_words": new_words,
+                "mastered_words": mastered_today,
+                "day_name": day_start.strftime("%A")[:3]  # Mon, Tue, etc.
+            })
+        
+        weekly_progress.reverse()  # 按时间正序排列
+        
+        # 获取本月统计
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        
+        monthly_new_words = db.query(VocabItem).filter(
+            VocabItem.user_id == user_id,
+            VocabItem.is_active == True,
+            VocabItem.added_date >= month_start
+        ).count()
+        
+        monthly_review_words = db.query(VocabItem).filter(
+            VocabItem.user_id == user_id,
+            VocabItem.is_active == True,
+            VocabItem.last_used >= month_start
+        ).count()
+        
+        monthly_mastered_words = db.query(VocabItem).filter(
+            VocabItem.user_id == user_id,
+            VocabItem.is_active == True,
+            VocabItem.isMastered == True,
+            VocabItem.last_used >= month_start
+        ).count()
+        
+        return {
+            "success": True,
+            "weekly_progress": weekly_progress,
+            "monthly_stats": {
+                "newWords": monthly_new_words,
+                "reviewWords": monthly_review_words,
+                "masteredWords": monthly_mastered_words,
+                "month_name": now.strftime("%B %Y")
+            },
+            "basic_stats": {
+                "total_vocab_count": total_vocab,
+                "mastered_vocab_count": mastered_vocab,
+                "unmastered_vocab_count": total_vocab - mastered_vocab,
+                "mastery_percentage": round((mastered_vocab / total_vocab) * 100, 1) if total_vocab > 0 else 0.0
+            },
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get learning progress failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get learning progress"
+        )
+
+
+@router.get("/vocab-list")
+async def get_user_vocab_list(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    获取用户的完整词汇列表（用于前端同步）
+    
+    返回用户所有激活的词汇项，格式兼容前端storage格式
+    """
+    try:
+        user_id = current_user["sub"]
+        
+        from app.models.vocab import VocabItem
+        vocab_items = db.query(VocabItem).filter(
+            VocabItem.user_id == user_id,
+            VocabItem.is_active == True
+        ).order_by(VocabItem.added_date.desc()).all()
+        
+        vocab_list = []
+        for item in vocab_items:
+            vocab_dict = {
+                "word": item.word,
+                "definition": item.definition or "",
+                "phonetic": item.phonetic or "",
+                "translation": item.translation or "",
+                "source": item.source or "",
+                "level": item.level or "",
+                "wrong_use_count": item.wrong_use_count or 0,
+                "right_use_count": item.right_use_count or 0,
+                "isMastered": item.isMastered or False,  # talkai_py兼容字段名
+                "added_date": item.added_date.isoformat() if item.added_date else "",
+                "last_used": item.last_used.isoformat() if item.last_used else "",
+                "updated_at": item.updated_at.isoformat() if item.updated_at else ""
+            }
+            vocab_list.append(vocab_dict)
+        
+        return {
+            "vocabulary": vocab_list,
+            "total_count": len(vocab_list),
+            "server_time": datetime.utcnow().isoformat()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get user vocab list failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get vocabulary list"
+        )
+
+
+@router.get("/vocab-list-simple")
+async def get_vocab_list_simple(
+    db: Session = Depends(get_db)
+):
+    """
+    获取默认用户的词汇列表（用于测试和前端同步，无需认证）
+    """
+    try:
+        # 使用默认用户ID
+        default_user_id = "3ed4291004c12c2a"
+        
+        from app.models.vocab import VocabItem
+        vocab_items = db.query(VocabItem).filter(
+            VocabItem.user_id == default_user_id,
+            VocabItem.is_active == True
+        ).order_by(VocabItem.added_date.desc()).all()
+        
+        vocab_list = []
+        for item in vocab_items:
+            vocab_dict = {
+                "word": item.word,
+                "definition": item.definition or "",
+                "phonetic": item.phonetic or "",
+                "translation": item.translation or "",
+                "source": item.source or "",
+                "level": item.level or "",
+                "wrong_use_count": item.wrong_use_count or 0,
+                "right_use_count": item.right_use_count or 0,
+                "isMastered": item.isMastered or False,  # talkai_py兼容字段名
+                "added_date": item.added_date.isoformat() if item.added_date else "",
+                "last_used": item.last_used.isoformat() if item.last_used else "",
+                "updated_at": item.updated_at.isoformat() if item.updated_at else ""
+            }
+            vocab_list.append(vocab_dict)
+        
+        return {
+            "vocabulary": vocab_list,
+            "total_count": len(vocab_list),
+            "server_time": datetime.utcnow().isoformat(),
+            "user_id": default_user_id
+        }
+        
+    except Exception as e:
+        logger.error(f"Get simple vocab list failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get vocabulary list"
         )
 
 
@@ -497,7 +734,7 @@ async def get_vocab_status(
         mastered_vocab = db.query(VocabItem).filter(
             VocabItem.user_id == user_id,
             VocabItem.is_active == True,
-            VocabItem.is_mastered == True
+            VocabItem.isMastered == True  # 使用talkai_py兼容字段名
         ).count()
         
         # 获取各等级词汇数量
