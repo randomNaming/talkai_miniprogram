@@ -649,6 +649,85 @@ class VocabularyService:
             db.rollback()
             return {"success": False, "message": f"Error loading vocabulary: {str(e)}"}
     
+    async def add_vocabulary_item(
+        self,
+        user_id: str,
+        word: str,
+        level: str = "none",
+        source: str = "user_input",
+        db: Session = None
+    ) -> bool:
+        """
+        Add a new vocabulary item to the user's learning vocabulary.
+        This method is called by the learning_vocab API endpoint.
+        
+        Args:
+            user_id: User ID
+            word: The word to add
+            level: Learning level (default: "none")
+            source: Source of the word (default: "user_input")
+            db: Database session
+            
+        Returns:
+            True if added successfully, False if word already exists
+        """
+        try:
+            # Skip Chinese words
+            if has_chinese(word):
+                logger.info(f"Skipping Chinese word: {word}")
+                return False
+            
+            # Normalize word to its original form
+            normalized_word = original(word)
+            
+            # Check if word already exists for this user
+            existing_vocab = (
+                db.query(VocabItem)
+                .filter(
+                    VocabItem.user_id == user_id,
+                    VocabItem.word == normalized_word,
+                    VocabItem.is_active == True
+                )
+                .first()
+            )
+            
+            if existing_vocab:
+                # Word already exists, update last_used and usage count
+                await self.update_vocabulary_usage(
+                    user_id=user_id,
+                    word=normalized_word,
+                    usage_type=source,
+                    db=db
+                )
+                logger.info(f"Word '{normalized_word}' already exists for user {user_id}, updated usage")
+                return True
+            else:
+                # Create new vocabulary item
+                new_vocab = VocabItem(
+                    user_id=user_id,
+                    word=normalized_word,
+                    source=source,
+                    level=level,
+                    added_date=datetime.utcnow(),
+                    last_used=datetime.utcnow(),
+                    right_use_count=0,
+                    wrong_use_count=1 if source in ["user_input", "lookup", "wrong_use", "chat_correction"] else 0,
+                    isMastered=False,
+                    is_active=True,
+                    mastery_score=0.0
+                )
+                
+                db.add(new_vocab)
+                db.commit()
+                
+                logger.info(f"Added new vocabulary word '{normalized_word}' for user {user_id}, source: {source}")
+                return True
+            
+        except Exception as e:
+            logger.error(f"Error adding vocabulary item: {e}")
+            db.rollback()
+            return False
+
     async def get_vocabulary_stats(self, user_id: str, db: Session) -> Dict[str, Any]:
         """Get vocabulary learning statistics for the user"""
         try:

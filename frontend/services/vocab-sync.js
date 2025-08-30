@@ -128,10 +128,10 @@ class VocabSyncManager {
         console.log(`[VocabSync] 开始同步，触发器: ${trigger}`);
       }
 
-      // 获取最新的词汇列表和状态
+      // 获取最新的词汇列表和状态（使用认证端点）
       const [vocabListResult, vocabStatusResult] = await Promise.all([
-        api.getVocabList(),
-        api.getVocabStatus()
+        api.user.getVocabList(), // 使用认证的词汇列表端点
+        api.user.getVocabStatus() // 使用认证的端点而非简化版
       ]);
 
       // 更新本地缓存

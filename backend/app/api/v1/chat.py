@@ -36,6 +36,7 @@ class GrammarCheckResult(BaseModel):
     corrected_input: str
     has_error: bool
     vocab_to_learn: List[VocabItem]
+    explanation: str = ""
 
 
 class ChatResponse(BaseModel):
@@ -148,20 +149,21 @@ async def send_message_stream(
                 logger.error(f"Vocabulary suggestion failed: {e}")
                 yield f"data: {json.dumps({'type': 'error', 'content': f'Vocabulary suggestion failed: {str(e)}'})}\n\n"
             
-            # 步骤4: 异步词汇更新 (如果有语法纠正结果)
-            if 'grammar_result' in locals() and grammar_result:
-                logger.info(f"Stream Step 4: Starting vocabulary update")
-                try:
-                    await ai_service.update_vocabulary_from_correction(
-                        grammar_result=grammar_result,
-                        user_input=user_input,
-                        user_id=user_id,
-                        db=db
-                    )
-                    yield f"data: {json.dumps({'type': 'vocab_update_complete', 'content': 'success'})}\n\n"
-                except Exception as e:
-                    logger.error(f"Vocabulary update failed: {e}")
-                    yield f"data: {json.dumps({'type': 'error', 'content': f'Vocabulary update failed: {str(e)}'})}\n\n"
+            # 步骤4: 取消自动词汇更新 - 只在用户点击"+"号时手动添加
+            # 异步词汇更新 (如果有语法纠正结果) - 已注释，改为手动添加模式
+            # if 'grammar_result' in locals() and grammar_result:
+            #     logger.info(f"Stream Step 4: Starting vocabulary update")
+            #     try:
+            #         await ai_service.update_vocabulary_from_correction(
+            #             grammar_result=grammar_result,
+            #             user_input=user_input,
+            #             user_id=user_id,
+            #             db=db
+            #         )
+            #         yield f"data: {json.dumps({'type': 'vocab_update_complete', 'content': 'success'})}\n\n"
+            #     except Exception as e:
+            #         logger.error(f"Vocabulary update failed: {e}")
+            #         yield f"data: {json.dumps({'type': 'error', 'content': f'Vocabulary update failed: {str(e)}'})}\n\n"
             
             # 步骤5: 保存聊天记录
             try:
@@ -385,24 +387,39 @@ async def check_grammar_only(
             ))
         
         corrected_input = result.get("corrected_input")
-        has_error = corrected_input and corrected_input != text
         
+        # 根据talkai_py逻辑，只有实质性语法/词汇错误才显示纠错
+        # 忽略纯标点符号差异(如缺少句号、逗号、问号等)
+        if corrected_input and corrected_input != text:
+            # 检查是否只是标点符号差异
+            import re
+            text_no_punct = re.sub(r'[.,!?;:\s]+$', '', text)
+            corrected_no_punct = re.sub(r'[.,!?;:\s]+$', '', corrected_input)
+            is_just_punctuation = text_no_punct.lower() == corrected_no_punct.lower()
+            
+            # 只有非标点差异的实质性错误才算has_error
+            has_error = not is_just_punctuation
+        else:
+            has_error = False
+        
+        # 注释掉自动词汇更新：错词不再自动添加到词汇库，只有用户点击"+"号时才手动添加
         # Background vocabulary update (like talkai_py)
-        if has_error and result:
-            import asyncio
-            asyncio.create_task(
-                ai_service.update_vocabulary_from_correction(
-                    grammar_result=result,
-                    user_input=text,
-                    user_id=user_id,
-                    db=db
-                )
-            )
+        # if has_error and result:
+        #     import asyncio
+        #     asyncio.create_task(
+        #         ai_service.update_vocabulary_from_correction(
+        #             grammar_result=result,
+        #             user_input=text,
+        #             user_id=user_id,
+        #             db=db
+        #         )
+        #     )
         
         return GrammarCheckResult(
             corrected_input=corrected_input or text,
             has_error=has_error,
-            vocab_to_learn=vocab_items
+            vocab_to_learn=vocab_items,
+            explanation=result.get("explanation", "")
         )
         
     except HTTPException:

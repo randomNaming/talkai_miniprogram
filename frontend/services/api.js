@@ -239,6 +239,16 @@ const user = {
       url: '/user/profile/learning-progress',
       method: 'GET'
     });
+  },
+
+  /**
+   * Get user vocabulary list (authenticated)
+   */
+  getVocabList() {
+    return request({
+      url: '/user/vocab-list',
+      method: 'GET'
+    });
   }
 };
 
@@ -364,6 +374,55 @@ const vocab = {
   getStats() {
     return request({
       url: '/vocab/stats',
+      method: 'GET'
+    });
+  }
+};
+
+// Learning Vocabulary APIs
+const learningVocab = {
+  /**
+   * Add word to learning vocabulary
+   */
+  addWord(word, level = "none", source = "user_input") {
+    return request({
+      url: '/learning-vocab/add-word',
+      method: 'POST',
+      data: { word, level, source }
+    });
+  },
+
+  /**
+   * Update vocabulary usage
+   */
+  updateUsage(word, source = "user_input") {
+    return request({
+      url: '/learning-vocab/update-usage',
+      method: 'POST',
+      data: { word, source }
+    });
+  },
+
+  /**
+   * Get learning vocabulary list
+   */
+  getList(params = {}) {
+    const queryString = Object.keys(params)
+      .map(key => `${key}=${encodeURIComponent(params[key])}`)
+      .join('&');
+    
+    return request({
+      url: `/learning-vocab/${queryString ? '?' + queryString : ''}`,
+      method: 'GET'
+    });
+  },
+
+  /**
+   * Get learning vocabulary stats
+   */
+  getStats() {
+    return request({
+      url: '/learning-vocab/stats',
       method: 'GET'
     });
   }
@@ -518,6 +577,19 @@ function updateUsageTime(sessionData) {
   return user.updateUsageTime(sessionData);
 }
 
+// Add vocabulary word to backend (proper API call)
+async function addVocabWordToBackend(word, source = "chat_correction") {
+  try {
+    console.log(`Adding vocabulary word to backend: ${word} (source: ${source})`);
+    const result = await learningVocab.addWord(word, "none", source);
+    console.log('Backend add word result:', result);
+    return result;
+  } catch (error) {
+    console.error('Failed to add vocabulary word to backend:', error);
+    throw error;
+  }
+}
+
 // Export all APIs
 module.exports = {
   // Core request function
@@ -530,11 +602,13 @@ module.exports = {
   vocab,
   dict,
   sync,
+  learningVocab,
   
   // Convenience functions
   login,
   sendChatMessage,
   addVocabWord,
+  addVocabWordToBackend,
   searchDict,
   syncVocabulary,
   getLearningProgress,

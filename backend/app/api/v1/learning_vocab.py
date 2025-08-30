@@ -72,7 +72,12 @@ async def get_learning_vocabulary(
             query = query.filter(VocabItem.level == level)
             
         if source:
-            query = query.filter(VocabItem.source == source)
+            # Support multiple sources separated by comma
+            if ',' in source:
+                source_list = [s.strip() for s in source.split(',')]
+                query = query.filter(VocabItem.source.in_(source_list))
+            else:
+                query = query.filter(VocabItem.source == source)
         
         # Order by last update
         query = query.order_by(VocabItem.updated_at.desc())

@@ -461,8 +461,12 @@ Page({
       },
       success: (res) => {
         console.log('Step 2 completed: Grammar check received', res.statusCode);
+        // 根据talkai_py ui.py on_correction_ready逻辑:
+        // 只有当has_error=true时才显示语法纠错
         if (res.statusCode === 200 && res.data.has_error) {
           this.updateAIMessageWithGrammarCheck(res.data);
+        } else {
+          console.log('No grammar errors found, not showing correction');
         }
       },
       fail: (err) => {
@@ -604,7 +608,8 @@ Page({
     };
     
     // Process grammar correction with UI enhancements (based on talkai_py ui.py)
-    // Note: Backend returns 'has_error' field in grammar_check
+    // 根据talkai_py ui.py on_correction_ready逻辑:
+    // 只有当has_error=true时才显示语法纠错
     if (result.grammar_check && result.grammar_check.has_error) {
       this.enhanceGrammarCorrection(aiMessage);
     }
@@ -694,20 +699,35 @@ Page({
     
     if (!vocab) return;
 
-    // Add to app global vocab list
-    const vocabItem = {
-      word: vocab.corrected,
-      definition: vocab.explanation || '',
-      source: 'chat_correction'
-    };
+    console.log('手动添加词汇到后端:', vocab.corrected);
 
-    app.addVocabWord(vocabItem);
-
-    wx.showToast({
-      title: '已添加到词汇表',
-      icon: 'success',
-      duration: 1500
-    });
+    // 调用后端API添加词汇
+    api.addVocabWordToBackend(vocab.corrected, 'chat_correction')
+      .then(result => {
+        console.log('词汇添加成功:', result);
+        
+        wx.showToast({
+          title: '已添加到词汇表',
+          icon: 'success',
+          duration: 1500
+        });
+        
+        // 触发词汇数据同步刷新
+        if (app.globalData.vocabSyncManager) {
+          setTimeout(() => {
+            app.globalData.vocabSyncManager.forceSync();
+          }, 500);
+        }
+      })
+      .catch(error => {
+        console.error('词汇添加失败:', error);
+        
+        wx.showToast({
+          title: '添加失败，请重试',
+          icon: 'none',
+          duration: 1500
+        });
+      });
   },
 
   /**
@@ -826,14 +846,24 @@ Page({
     message.confidence_level = confidenceLevel;
     message.confidence_indicator = this.getConfidenceIndicator(confidenceLevel);
     
-    // Get explanation if available
-    if (grammarCheck.vocab_to_learn && grammarCheck.vocab_to_learn.length > 0) {
+    // Get explanation if available (复制talkai_py add_corrected_input的explanation处理)
+    let explanation = '';
+    
+    // 首先检查主要的explanation字段
+    if (grammarCheck.explanation && grammarCheck.explanation.trim()) {
+      explanation = grammarCheck.explanation.trim();
+    } else if (grammarCheck.vocab_to_learn && grammarCheck.vocab_to_learn.length > 0) {
+      // 如果没有主要explanation，从词汇项中收集
       const explanations = grammarCheck.vocab_to_learn
-        .filter(item => item.explanation)
-        .map(item => item.explanation);
+        .filter(item => item.explanation && item.explanation.trim())
+        .map(item => item.explanation.trim());
       if (explanations.length > 0) {
-        message.correction_explanation = explanations.join('; ');
+        explanation = explanations.join('; ');
       }
+    }
+    
+    if (explanation) {
+      message.correction_explanation = explanation;
     }
     
     // Create highlighted correction (simplified for WeChat rich-text)
@@ -884,29 +914,101 @@ Page({
   },
   
   /**
-   * Create highlighted correction text for rich-text display
+   * Create highlighted correction text for rich-text display (based on talkai_py add_corrected_input)
    */
   createHighlightedCorrection: function(correctedInput, vocabToLearn) {
-    if (!correctedInput || !vocabToLearn || vocabToLearn.length === 0) {
+    if (!correctedInput) {
       return correctedInput;
     }
     
-    let highlightedText = correctedInput;
+    // 先为整个文本设置正确部分的颜色（绿色）- 复制talkai_py逻辑
+    let highlighted_input = `<span style="color: #27ae60;">${correctedInput}</span>`;
     
-    // Simple highlighting - replace corrected words with colored spans
-    vocabToLearn.forEach(item => {
-      if (item.corrected && item.corrected !== item.original) {
-        const color = this.getErrorTypeColor(item.error_type);
-        // For WeChat rich-text, use simple HTML-like format
-        const pattern = new RegExp('\\b' + this.escapeRegExp(item.corrected) + '\\b', 'gi');
-        highlightedText = highlightedText.replace(pattern, 
-          `<span style="color: ${color}; font-weight: bold;">${item.corrected}</span>`
-        );
+    // 如果有值得学习的单词，使用粗体和不同颜色标记它们 - 复制talkai_py逻辑
+    if (vocabToLearn && vocabToLearn.length > 0) {
+      vocabToLearn.forEach(wordPair => {
+        const corrected = wordPair.corrected;
+        const original = wordPair.original;
+        const errorType = wordPair.error_type || "vocabulary";
+        
+        if (corrected && (corrected !== original)) {
+          // 使用智能匹配查找词汇变形 (复制talkai_py find_word_variants_in_text逻辑)
+          const variantWord = this.findWordVariantsInText(corrected, correctedInput);
+          if (variantWord) {
+            // 根据错误类型使用不同颜色 (复制talkai_py get_error_type_color逻辑)
+            const color = this.getErrorTypeColor(errorType);
+            const pattern = new RegExp('\\b' + this.escapeRegExp(variantWord) + '\\b', 'gi');
+            const replacement = `<b style="color: ${color};">${variantWord}</b>`;
+            highlighted_input = highlighted_input.replace(pattern, replacement);
+          }
+        }
+      });
+    }
+    
+    return highlighted_input;
+  },
+  
+  /**
+   * 智能查找目标词汇在文本中的变形形式 (复制talkai_py find_word_variants_in_text函数)
+   */
+  findWordVariantsInText: function(targetWord, text) {
+    // 如果目标词是多词短语，不进行变形匹配，避免误匹配
+    if (targetWord.split(' ').length > 1) {
+      // 对于多词短语，只进行精确匹配
+      const exactPattern = new RegExp('\\b' + this.escapeRegExp(targetWord) + '\\b', 'i');
+      if (exactPattern.test(text)) {
+        return targetWord;
+      } else {
+        return null;
       }
-    });
+    }
     
-    // Wrap entire text in green for correct parts
-    return `<span style="color: #27ae60;">${highlightedText}</span>`;
+    // 常见的后缀变形
+    const commonSuffixes = ['s', 'es', 'ed', 'ing', 'er', 'est', 'ly', 'tion', 'sion', 'ness', 'ment'];
+    
+    // 1. 精确匹配（优先级最高）
+    const exactPattern = new RegExp('\\b' + this.escapeRegExp(targetWord) + '\\b', 'i');
+    if (exactPattern.test(text)) {
+      return targetWord;
+    }
+    
+    // 2. 查找文本中是否有以目标词汇为词根的变形（仅限单词）
+    const wordsInText = text.toLowerCase().match(/\b\w+\b/g) || [];
+    const targetLower = targetWord.toLowerCase();
+    
+    for (let word of wordsInText) {
+      // 检查文本中的词是否以目标词开头（目标词是词根）
+      if (word.startsWith(targetLower) && word.length > targetLower.length) {
+        const suffix = word.slice(targetLower.length);
+        // 确保后缀是纯字母，不包含空格或标点
+        if (/^[a-z]+$/i.test(suffix) && (commonSuffixes.includes(suffix) || suffix.length <= 3)) {
+          return word;
+        }
+      }
+      
+      // 检查目标词是否以文本中的词开头（文本中的词是词根）
+      if (targetLower.startsWith(word) && targetLower.length > word.length) {
+        const suffix = targetLower.slice(word.length);
+        // 确保后缀是纯字母，不包含空格或标点
+        if (/^[a-z]+$/i.test(suffix) && (commonSuffixes.includes(suffix) || suffix.length <= 3)) {
+          return word;
+        }
+      }
+    }
+    
+    // 3. 包含匹配（最后手段，处理不规则变形，仅限单词）
+    for (let word of wordsInText) {
+      // 双向包含检查，但要求有足够的重叠
+      const minLen = Math.min(word.length, targetLower.length);
+      if (minLen >= 3) {  // 至少3个字符才考虑包含匹配
+        if ((targetLower.includes(word) && targetLower.length >= minLen * 0.7) ||
+           (word.includes(targetLower) && word.length >= minLen * 0.7)) {
+          return word;
+        }
+      }
+    }
+    
+    return null;
   },
   
   /**

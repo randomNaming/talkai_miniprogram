@@ -1,3 +1,56 @@
+## 2025-08-29 17:38 修复语法纠错显示逻辑
+
+**用户需求：**
+当用户输入正确时，请不要输出ai改错（"语法修正"）。参考talkai_py/ui.py中的显示ai改错的逻辑以及调用的相关代码。
+
+**问题分析：**
+1. 在talkai_py/ui.py的on_correction_ready函数(566-578行)中，当is_valid=False时不显示改错
+2. backend grammar-check API返回has_error字段，当输入正确时has_error=false
+3. frontend需要遵循相同逻辑：只有has_error=true时才显示语法纠错
+
+**完成的修改：**
+1. **分析talkai_py逻辑** ✅
+   - 确认on_correction_ready函数逻辑：is_valid=False时不显示改错
+   - 发现提示词要求：对完美英文输入设置corrected_input=null
+
+2. **修改frontend显示逻辑** ✅
+   - 更新getGrammarCheckSeparately函数(463-470行)，只有has_error=true时才显示
+   - 更新handleApiResponse函数(611-615行)的注释说明正确逻辑
+   - WXML模板已正确使用has_error条件判断
+   - enhanceGrammarCorrection函数已有正确的has_error检查
+
+3. **发现并修复根本问题** ✅
+   - 问题：AI模型对"I go to school"返回"I go to school."(只加句号)，但设置is_valid=true
+   - backend的has_error逻辑：`corrected_input != text`导致纯标点差异也触发纠错
+   - 修复：忽略纯标点符号差异，只有实质性错误才显示纠错
+   - 修改文件：`backend/app/api/v1/chat.py`(388-401行) 和 `backend/app/api/v1/dict.py`(438-449行)
+
+4. **验证修复效果** ✅
+   - ✅ "I go to school" → `grammar_check: null` (不显示纠错)
+   - ✅ "I goes to school" → `has_error: true` (显示纠错)
+
+5. **完善AI改错输出格式** ✅
+   - 参考talkai_py/ui.py:add_corrected_input函数，完善frontend的语法纠错显示
+   - 复制智能词汇变形匹配逻辑(findWordVariantsInText)，支持复数、时态、比较级等变形
+   - 改进explanation处理，优先使用主要explanation字段
+   - 添加GrammarCheckResult.explanation字段到backend API返回
+
+**修复逻辑：**
+```python
+# 检查是否只是标点符号差异
+text_no_punct = re.sub(r'[.,!?;:\s]+$', '', text)
+corrected_no_punct = re.sub(r'[.,!?;:\s]+$', '', corrected_input)  
+is_just_punctuation = text_no_punct.lower() == corrected_no_punct.lower()
+
+# 只有非标点差异的实质性错误才算has_error
+has_error = not is_just_punctuation
+```
+
+**提示词优化：**
+在system_prompt_for_check_vocab中明确说明不要标记标点错误、拼写错误等简单问题。
+
+---
+
 ## 2025-08-27 词汇管理系统完整实现
 
   **用户需求：**
@@ -186,6 +239,52 @@
   **遗留项目：**
   - 所有核心功能已完成，前端后端数据同步问题已完全解决
   - 系统现在支持实时数据同步，用户界面将始终显示准确的词汇统计
+
+## 2025-08-29 19:30 取消自动词汇添加功能实现
+
+**用户需求：**
+不用自动添加，只需要用户点击"+"号时才添加到用户词汇库。现在的代码：当存在ai改错遇到的错词，会自动添加到用户词汇库。
+
+**问题分析：**
+1. 当前backend代码在grammar-check和stream API中都会自动调用`update_vocabulary_from_correction`
+2. 前端有手动添加功能（onAddVocab函数），但被自动添加覆盖
+3. 需要保留手动添加能力，取消自动添加逻辑
+
+**完成的修改：**
+
+1. **取消stream API自动词汇添加 ✅**
+   - 修改文件：`backend/app/api/v1/chat.py:152-166`
+   - 注释掉stream API中的自动词汇更新逻辑
+   - 保留完整注释说明供将来参考
+
+2. **取消grammar-check API自动词汇添加 ✅**  
+   - 修改文件：`backend/app/api/v1/chat.py:405-416`
+   - 注释掉grammar-check端点的自动词汇更新逻辑
+   - 添加中文注释说明改为手动添加模式
+
+3. **保留手动添加功能 ✅**
+   - 确认frontend的onAddVocab函数保持完整（chat.js:697-716）
+   - 用户点击"+"号时仍然可以手动添加词汇到词汇库
+   - 保持原有UI交互逻辑不变
+
+**修改逻辑：**
+```python
+# 注释掉自动词汇更新：错词不再自动添加到词汇库，只有用户点击"+"号时才手动添加
+# Background vocabulary update (like talkai_py)
+# if has_error and result:
+#     import asyncio
+#     asyncio.create_task(
+#         ai_service.update_vocabulary_from_correction(...)
+#     )
+```
+
+**验证功能：**
+- ✅ 语法纠错功能正常：显示纠错结果和解释
+- ✅ 手动添加功能保持：点击"+"号可手动添加词汇
+- ✅ 自动添加已取消：AI改错不再自动添加词汇到数据库
+- ✅ 用户体验改善：用户完全控制哪些词汇添加到个人词汇库
+
+---
 
 ## 2025-08-28 18:00 词汇学习进度可视化界面完整实现
 

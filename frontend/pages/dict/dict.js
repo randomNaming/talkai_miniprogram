@@ -135,21 +135,15 @@ Page({
         wx.hideLoading();
         
         if (result.added_to_vocab) {
-          // Also add to frontend global data to update statistics immediately
+          // 触发词汇同步以更新统计数据
           const app = getApp();
-          app.addVocabWord({
-            word: word,
-            source: 'lookup',
-            level: 'none',
-            wrong_use_count: 1,      // talkai_py兼容字段名
-            right_use_count: 0,      // talkai_py兼容字段名
-            isMastered: false,       // talkai_py兼容字段名
-            added_date: new Date().toISOString(),  // talkai_py兼容字段名
-            last_used: new Date().toISOString(),   // talkai_py兼容字段名
-            definition: result.definition || ''
-          });
+          if (app.globalData.vocabSyncManager) {
+            setTimeout(() => {
+              app.globalData.vocabSyncManager.forceSync();
+            }, 500);
+          }
           
-          // 触发profile页面数据刷新 - 通过设置标志来通知需要刷新
+          // 触发profile页面数据刷新
           wx.setStorageSync('vocab_status_needs_refresh', true);
           
           wx.showToast({
@@ -158,7 +152,7 @@ Page({
             duration: 1500
           });
           
-          console.log('Vocabulary added successfully, profile data refresh triggered');
+          console.log('Dictionary word added successfully, sync triggered');
         } else {
           wx.showToast({
             title: result.message || '添加失败',
@@ -182,30 +176,41 @@ Page({
    * Add word to database using lookup endpoint
    */
   addWordToDatabase: function(word) {
-    return new Promise((resolve, reject) => {
-      const envConfig = require('../../config/env');
-      const config = envConfig.getConfig();
-      const apiUrl = `${config.API_BASE_URL}/dict/lookup-simple?word=${encodeURIComponent(word)}`;
-      
-      wx.request({
-        url: apiUrl,
-        method: 'GET',
-        header: {
-          'Content-Type': 'application/json'
-        },
-        success: (res) => {
-          console.log('Dict lookup response:', res.statusCode, res.data);
-          if (res.statusCode === 200) {
-            resolve(res.data);
-          } else {
-            reject(new Error(res.data?.detail || 'Request failed'));
-          }
-        },
-        fail: (err) => {
-          console.error('Dict lookup request failed:', err);
-          reject(new Error(err.errMsg || 'Network request failed'));
+    const api = require('../../services/api');
+    
+    return new Promise(async (resolve, reject) => {
+      try {
+        // 1. 先查询词汇定义
+        const dictResult = await api.dict.query(word, false);
+        
+        if (!dictResult || !dictResult.word) {
+          resolve({
+            word: word,
+            definition: `未找到单词 '${word}' 的定义`,
+            added_to_vocab: false,
+            message: `Word '${word}' not found in dictionary`
+          });
+          return;
         }
-      });
+        
+        // 2. 将词汇添加到学习词汇库（使用认证API）
+        const addResult = await api.addVocabWordToBackend(word, 'lookup');
+        
+        // 3. 返回组合结果
+        resolve({
+          word: dictResult.word,
+          definition: dictResult.definition,
+          phonetic: dictResult.phonetic,
+          translation: dictResult.translation,
+          pos: dictResult.pos,
+          added_to_vocab: true,
+          message: `已将 '${word}' 添加到词汇库`
+        });
+        
+      } catch (error) {
+        console.error('Dict lookup and add failed:', error);
+        reject(error);
+      }
     });
   }
 });

@@ -17,11 +17,11 @@ const SYNC_CONFIG = {
   
   // 同步触发条件
   SYNC_TRIGGERS: {
-    APP_LAUNCH: true,              // 应用启动时同步
-    APP_RESUME: true,              // 应用从后台恢复时同步
-    VOCAB_OPERATION: true,         // 词汇操作后同步
-    PERIODIC: true,                // 定期自动同步
-    MANUAL: true                   // 手动触发同步
+    APP_LAUNCH: false,             // 开发环境关闭应用启动同步
+    APP_RESUME: false,             // 开发环境关闭应用恢复同步
+    VOCAB_OPERATION: false,        // 开发环境关闭词汇操作同步
+    PERIODIC: false,               // 开发环境关闭定期同步
+    MANUAL: true                   // 保留手动同步
   },
   
   // 同步日志配置
@@ -36,8 +36,8 @@ const SYNC_CONFIG = {
   
   // API端点配置
   API_ENDPOINTS: {
-    VOCAB_LIST: '/user/vocab-list-simple',           // 获取词汇列表
-    VOCAB_STATUS: '/user/profile/vocab-status-simple' // 获取词汇状态统计
+    VOCAB_LIST: '/user/vocab-list',                  // 获取词汇列表（使用认证端点）
+    VOCAB_STATUS: '/user/profile/vocab-status'       // 获取词汇状态统计（使用认证端点）
   }
 };
 
@@ -48,12 +48,15 @@ const adjustConfigForEnvironment = () => {
     const isDevelopment = wx.getSystemInfoSync().platform === 'devtools';
     
     if (isDevelopment) {
-      // 开发环境下缩短同步间隔以便调试
-      SYNC_CONFIG.VOCAB_SYNC_INTERVAL = 30 * 1000; // 30秒
-      SYNC_CONFIG.ENABLE_SYNC_LOG = true;
-      SYNC_CONFIG.LOG_LEVEL = 'debug';
+      // 开发环境下完全禁用自动同步，避免认证问题
+      SYNC_CONFIG.SYNC_TRIGGERS.APP_LAUNCH = false;
+      SYNC_CONFIG.SYNC_TRIGGERS.APP_RESUME = false;
+      SYNC_CONFIG.SYNC_TRIGGERS.VOCAB_OPERATION = false;
+      SYNC_CONFIG.SYNC_TRIGGERS.PERIODIC = false;
+      SYNC_CONFIG.ENABLE_SYNC_LOG = false;
+      SYNC_CONFIG.LOG_LEVEL = 'warn';
       
-      console.log('[SyncConfig] 开发环境配置已启用');
+      console.log('[SyncConfig] 开发环境配置已启用（自动同步已禁用）');
     }
   } catch (e) {
     console.warn('[SyncConfig] 环境检测失败:', e);

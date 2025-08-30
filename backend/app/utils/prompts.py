@@ -31,6 +31,7 @@ Instructions:
 - CRITICAL: For 'corrected_input', provide the GRAMMATICALLY CORRECT version of the input sentence. Do NOT answer questions or provide explanations.
 - IMPORTANT: When there are Chinese words, 'original' field MUST contain the Chinese word, and 'corrected' field MUST contain the English translation.
 - CRITICAL: For fixed collocations, identify the ROOT WORD that requires the preposition and mark the COMPLETE collocation.
+- IMPORTANT: Do NOT mark simple errors like punctuation mistakes, typos, or minor formatting issues for learning. Only mark substantial vocabulary/grammar/collocation errors.
 
 Examples of CORRECT behavior:
 - Input: "combination 是什么意思" → corrected_input: "What does 'combination' mean?"
@@ -66,7 +67,7 @@ Response in JSON Format: Your response MUST be a valid JSON object containing th
    - MANDATORY: If 'words_deserve_to_learn' is not empty, 'corrected_input' MUST NOT be null.
    - If human input is perfect English with no Chinese words and no errors: set to null.
 
-3. 'is_valid': Boolean value. Set to true if very confidence in the overall correction (clear errors, standard corrections), false otherwise.
+3. 'is_valid': Boolean value. Set to true ONLY if there are substantial vocabulary/grammar/collocation errors that require learning. Set to false for perfect input or minor issues like punctuation/typos.
 
 4. 'explanation': A brief explanation in Chinese as a single string explaining why the corrections were necessary. If multiple errors, separate explanations with semicolons.
 
@@ -74,6 +75,11 @@ Examples:
 - Input: "combination 是什么意思" → corrected_input: "What does 'combination' mean?", words_deserve_to_learn: [original="是什么意思", corrected="mean", error_type="translation"]
 - Input: "I'm interested science" → corrected_input: "I'm interested in science.", words_deserve_to_learn: [original="interested", corrected="interested in", error_type="collocation"]
 - Input: "She's afraid flying" → corrected_input: "She's afraid of flying.", words_deserve_to_learn: [original="afraid", corrected="afraid of", error_type="collocation"]
+
+Examples of what NOT to mark for learning:
+- Input: "I go to school" → corrected_input: null, is_valid: false (perfect input, no errors)
+- Input: "hello how are you" → corrected_input: "Hello, how are you?", is_valid: false (only punctuation/capitalization)
+- Input: "teh cat" → corrected_input: "the cat", is_valid: false (simple typo, not vocabulary error)
 
 Remember: Always respond in valid JSON format only. No additional text outside the JSON object.
 """

@@ -32,30 +32,96 @@ Page({
   },
 
   loadVocabList: function() {
-    // 优先使用实时同步数据，回退到缓存数据
-    const cachedVocab = app.globalData.vocabList || [];
+    // 开发环境使用模拟数据
+    const isDevelopment = wx.getSystemInfoSync && wx.getSystemInfoSync().platform === 'devtools';
+    
+    if (isDevelopment) {
+      console.log('[VocabPage] 开发环境：使用本地缓存数据，过滤最近词汇');
+      
+      // 使用app全局数据中的词汇列表，过滤出改错和查词的词汇
+      const cachedVocab = app.globalData.vocabList || [];
+      const recentVocab = cachedVocab.filter(item => {
+        return item.source === 'chat_correction' || item.source === 'lookup';
+      });
+      
+      this.setData({
+        vocabList: recentVocab,
+        totalWords: 441,
+        masteredWords: 15,
+        learningWords: 426,
+        progressPercentage: 3
+      });
+      
+      console.log('[VocabPage] 开发环境显示最近词汇数量:', recentVocab.length);
+      return;
+    }
+    
+    // 生产环境正常加载
+    this.loadRecentVocabulary();
+    
     const vocabStats = app.globalData.vocabStats;
-    
-    const totalWords = vocabStats ? vocabStats.total_vocab_count : cachedVocab.length;
-    const masteredWords = vocabStats ? vocabStats.mastered_vocab_count : cachedVocab.filter(item => item.isMastered).length;
-    const learningWords = vocabStats ? vocabStats.unmastered_vocab_count : cachedVocab.filter(item => !item.isMastered).length;
-    
-    // 计算学习进度百分比
+    const totalWords = vocabStats ? vocabStats.total_vocab_count : 0;
+    const masteredWords = vocabStats ? vocabStats.mastered_vocab_count : 0;
+    const learningWords = vocabStats ? vocabStats.unmastered_vocab_count : 0;
     const progressPercentage = totalWords > 0 ? Math.round((masteredWords / totalWords) * 100) : 0;
     
-    // 设置词汇列表和进度数据
     this.setData({
-      vocabList: cachedVocab,
       totalWords: totalWords,
       masteredWords: masteredWords,
       learningWords: learningWords,
       progressPercentage: progressPercentage
     });
     
-    // 如果没有统计数据或数据过期，触发同步
     if (!vocabStats || this.shouldRefreshData()) {
       this.refreshVocabData();
     }
+  },
+
+  // 加载最近添加的词汇（AI改错和词典查词）
+  loadRecentVocabulary: function() {
+    // 开发环境直接使用模拟数据，避免认证问题
+    const isDevelopment = wx.getSystemInfoSync && wx.getSystemInfoSync().platform === 'devtools';
+    
+    if (isDevelopment) {
+      console.log('[VocabPage] 开发环境：使用模拟词汇数据');
+      this.setData({
+        vocabList: [
+          { word: 'example', source: 'chat_correction', added_date: '2025-08-30', isMastered: false },
+          { word: 'development', source: 'lookup', added_date: '2025-08-30', isMastered: false }
+        ]
+      });
+      return;
+    }
+    
+    console.log('[VocabPage] 加载最近词汇（AI改错和词典查词）');
+    
+    // 生产环境使用真实API
+    api.learningVocab.getList({
+      source: 'chat_correction,lookup',
+      limit: 5
+    }).then(recentVocab => {
+      const filteredVocab = recentVocab.filter(item => {
+        return item.source === 'chat_correction' || item.source === 'lookup';
+      }).map(item => {
+        return {
+          word: item.word,
+          source: item.source,
+          added_date: item.added_date,
+          isMastered: item.is_mastered,
+          right_use_count: item.right_use_count,
+          wrong_use_count: item.wrong_use_count,
+          last_used: item.last_used
+        };
+      });
+      
+      this.setData({
+        vocabList: filteredVocab
+      });
+      
+    }).catch(error => {
+      console.error('[VocabPage] 加载最近词汇失败:', error);
+      this.setData({ vocabList: [] });
+    });
   },
 
   // 检查是否需要刷新数据

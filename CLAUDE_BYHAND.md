@@ -61,7 +61,7 @@
   🔍 查看方法
 
   1. 查看词汇总数:
-  sqlite3 data/db/talkai.db "SELECT COUNT(*) FROM vocab_items WHERE user_id='your_user_id'
+  sqlite3 data/db/talkai.db "SELECT COUNT(*) FROM vocab_items WHERE user_id='3ed4291004c12c2a'
    AND is_active=1;"
 
   2. 按来源分组统计:
@@ -84,23 +84,182 @@
 
   你可以使用SQLite Browser工具或者命令行直接查看和管理这些词汇数据。
 
-----------
-当我使用词典查询单词时，后端terminal log显示更新词汇成功：更新词汇 cosmology for user     │
-│   3ed4291004c12c2a: right=0, wrong=2, mastered=False, source=lookup                         │
-│   2025-08-28 16:07:24.132 | INFO     | app.api.v1.dict:lookup_word_simple:230 -             │
-│   Successfully added English word 'cosmology' to vocabulary (source: lookup)                │
-│   --                                                                                        │
-│   但是我查询数据可却没有发现词汇库+1：                                                      │
-│   (base) pean@MacBook-Air backend % sqlite3 data/db/talkai.db "SELECT COUNT(*) FROM         │
-│   vocab_items WHERE user_id='3ed4291004c12c2a'                                              │
-│      AND is_active=1;"                                                                      │
-│   458                                                                                       │
-│   (base) pean@MacBook-Air backend % sqlite3 data/db/talkai.db "SELECT COUNT(*) FROM         │
-│   vocab_items WHERE user_id='3ed4291004c12c2a'                                              │
-│      AND is_active=1;"                                                                      │
-│   458                                                                                       │
-│   -----------                                                                               │
-│   另外，458 这个词汇数量也和UI界面中的词汇统计的数量（440）不一致，而且440这里的这个数字页  │
-│   没有因为词典查询单词而+1.UI界面中的词汇统计截图：/Users/pean/Desktop/词汇状态.png 
 
-          <view class="progress-fill" style="width: {{progressPercentage}}%"></view>
+-------------
+ 📊 数据库结构详解
+
+  用户表 (users)
+
+  - id (VARCHAR, 主键): 用户唯一标识符
+  - openid (VARCHAR, 唯一): 微信OpenID
+  - nickname (VARCHAR): 用户昵称
+  - grade (VARCHAR): 学习级别 (Primary School, CET4等)
+  - age, gender: 用户基本信息
+  - created_at, last_login_at: 时间戳
+  - total_usage_time, chat_history_count: 使用统计
+
+  词汇表 (vocab_items)
+
+  - id (INTEGER, 主键): 词汇条目ID
+  - user_id (VARCHAR, 外键): 关联用户ID
+  - word (VARCHAR): 单词
+  - source (VARCHAR): 来源 ('chat_correction', 'lookup', 'level_vocab')
+  - level (VARCHAR): 难度级别
+  - wrong_use_count, right_use_count: 使用统计
+  - isMastered (BOOLEAN): 是否已掌握
+  - added_date, last_used: 时间戳
+
+  数据库查询示例
+
+  查询用户信息和词汇统计:
+  sqlite3 data/db/talkai.db "
+  SELECT u.id, u.nickname, u.grade, 
+         COUNT(v.id) as total_vocab,
+         SUM(CASE WHEN v.isMastered = 1 THEN 1 ELSE 0 END) as mastered_vocab
+  FROM users u 
+  LEFT JOIN vocab_items v ON u.id = v.user_id 
+  GROUP BY u.id 
+  LIMIT 5;"
+
+  查询特定用户的词汇:
+  # 查询用户所有词汇
+  sqlite3 data/db/talkai.db "
+  SELECT word, source, wrong_use_count, right_use_count, isMastered 
+  FROM vocab_items 
+  WHERE user_id = 'USER_ID_HERE' 
+  ORDER BY added_date DESC;"
+
+  # 查询特定单词
+  sqlite3 data/db/talkai.db "
+  SELECT * FROM vocab_items 
+  WHERE user_id = 'USER_ID_HERE' AND word = 'WORD_HERE';"
+
+  # 查询最近学习词汇（AI改错+词典查词）
+  sqlite3 data/db/talkai.db "
+  SELECT word, source, added_date 
+  FROM vocab_items 
+  WHERE user_id = 'USER_ID_HERE' 
+  AND source IN ('chat_correction', 'lookup') 
+  ORDER BY added_date DESC 
+  LIMIT 20;"
+
+  当前数据库状态:
+  - 总用户数: 93个
+  - 测试用户 c697fcdff9a3ae31: 439个词汇（全部为级别词汇）
+  - 最活跃用户有5756个词汇
+
+  数据库完整实现了talkai_py的功能，支持词汇来源追踪、掌握度统计和学习进度管理。
+--------------
+
+ 问题原因：
+  1. 开发环境特性：微信开发者工具每次生成不同的js_code
+  2. 动态OpenID生成：后端根据js_code动态生成dev_openid_xxxx
+  3. 多用户创建：每次登录都创建新用户，导致数据分散
+
+  数据库当前状态：
+  - ef30cdb5499ebed6: 439个词汇（level_vocab）
+  - 73c19ed6d8bedc6d: 2755个词汇
+  - 总共93个开发用户
+
+  修复方案：
+  ✅ 固定开发环境用户ID - 修改auth.py:55使用固定openid
+
+  查询数据库的正确方法：
+
+  # 1. 查看当前JWT token对应的用户
+  # token中的"sub"字段就是真实的user_id
+
+  # 2. 查询特定用户的词汇库
+  sqlite3 data/db/talkai.db "
+  SELECT u.id, u.nickname, u.grade, 
+         COUNT(v.id) as total_vocab,
+         COUNT(CASE WHEN v.source='chat_correction' THEN 1 END) as ai_corrections,
+         COUNT(CASE WHEN v.source='lookup' THEN 1 END) as lookups
+  FROM users u 
+  LEFT JOIN vocab_items v ON u.id = v.user_id 
+  WHERE u.id = 'USER_ID_FROM_JWT_TOKEN'
+  GROUP BY u.id;"
+
+  # 3. 查询具体词汇信息
+  sqlite3 data/db/talkai.db "
+  SELECT word, source, wrong_use_count, right_use_count, isMastered, added_date 
+  FROM vocab_items 
+  WHERE user_id = 'USER_ID_FROM_JWT_TOKEN' AND word = 'cosmology';"
+
+  下次登录时：现在所有开发环境登录都会使用同一个用户ID，避免数据分散问题。
+
+  -------------
+
+⏺ 🔍 Console 问题分析
+
+  问题1: Console 滚动刷屏
+
+  原因： 词汇同步管理器在重试失败的同步请求，每次失败都会再次重试，形成循环
+
+  问题2: 403 Forbidden 错误
+
+  根本原因： Token认证失败
+  - api.js:67 - 请求 /user/vocab-list 返回403
+  - api.js:67 - 请求 /user/profile/vocab-status 返回403
+  - 错误信息：{detail: "Not authenticated"}
+
+  调用链分析：
+  app.js:33 onLaunch
+  → app.js:93 initVocabSync
+  → vocab-sync.js:50 init
+  → vocab-sync.js:133 api.user.getVocabList()
+  → api.js:248 getVocabList()
+  → api.js:45 request()
+  → 403 Forbidden
+
+  问题核心：
+  1. Token过期/无效 - 前端存储的token已失效
+  2. 重试循环 - 同步失败后不断重试，造成console刷屏
+  3. 认证流程 - 应用启动时没有正确重新认证
+
+  解决方案：
+  需要在应用启动时检查token有效性，如果无效则重新登录，避免使用失效token进行API调用。
+
+  当前问题是前端使用了过期的token，导致所有认证API都返回403，同步管理器不断重试失败的请求
+  。
+
+
+-----------------
+
+  问题核心：
+  1. Token过期/无效 - 前端存储的token已失效
+  2. 重试循环 - 同步失败后不断重试，造成console刷屏
+  3. 认证流程 - 应用启动时没有正确重新认证
+
+  解决方案：
+  需要在应用启动时检查token有效性，如果无效则重新登录，避免使用失效token进行API调用。
+
+  当前问题是前端使用了过期的token，导致所有认证API都返回403，同步管理器不断重试失败的请求
+  。
+
+  -----------
+⏺ 是的，openid确实唯一且与微信用户绑定
+
+  但仍需JWT的原因：
+
+  1. 传输安全 - openid直接传输容易被截获和重放攻击
+  2. 权限控制 - JWT可包含用户权限、过期时间等额外信息
+  3. 微信规范 - 微信小程序推荐使用临时凭证而非长期标识符
+  4. 会话管理 - JWT提供会话过期机制，openid是永久标识符
+    微信登录 → 获取openid → 服务器验证 → 生成JWT(包含user_id) → 客户端使用JWT访问API
+
+
+    -------
+    ⏺  前面提到的3个问题：是的，根源是同一个：Token失效
+
+  问题链：
+  1. 根源： Token过期/无效
+  2. 直接后果： API调用返回403
+  3. 连锁反应： 同步管理器检测到失败后不断重试
+  4. 表现症状： Console不停滚动刷屏
+
+  调用链分析：
+  Token失效 → 403错误 → 同步重试 → 再次403 → 继续重试 → Console刷屏
+
+  解决方案只需修复根源：
+  应用启动时检查token有效性，如果无效则重新认证，避免使用失效token进行后续所有API调用。

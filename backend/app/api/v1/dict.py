@@ -435,8 +435,20 @@ async def dict_ai_chat(request: dict):
         corrected_input = grammar_result.get("corrected_input")
         words_deserve_to_learn = grammar_result.get("words_deserve_to_learn", [])
         
-        # Only show correction if corrected_input exists AND is different from user input
+        # 根据talkai_py逻辑，只有实质性语法/词汇错误才显示纠错
+        # 忽略纯标点符号差异(如缺少句号、逗号、问号等)
+        show_correction = False
         if corrected_input and corrected_input != message:
+            # 检查是否只是标点符号差异
+            import re
+            text_no_punct = re.sub(r'[.,!?;:\s]+$', '', message)
+            corrected_no_punct = re.sub(r'[.,!?;:\s]+$', '', corrected_input)
+            is_just_punctuation = text_no_punct.lower() == corrected_no_punct.lower()
+            
+            # 只有非标点差异的实质性错误才显示
+            show_correction = not is_just_punctuation
+        
+        if show_correction:
             from pydantic import BaseModel
             from typing import List
             
@@ -455,8 +467,9 @@ async def dict_ai_chat(request: dict):
             
             grammar_check = {
                 "corrected_input": corrected_input,
-                "has_error": True,
-                "vocab_to_learn": vocab_items
+                "has_error": show_correction,  # 使用正确的逻辑判断
+                "vocab_to_learn": vocab_items,
+                "explanation": grammar_result.get("explanation", "")
             }
         
         # Step 4: Generate vocabulary suggestions (simplified for anonymous)

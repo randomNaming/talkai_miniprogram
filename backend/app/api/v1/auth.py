@@ -52,7 +52,7 @@ async def wechat_login(
             if login_data.js_code and login_data.js_code.startswith("0") and len(login_data.js_code) > 20:
                 logger.warning(f"Using temporary mock session for development - js_code: {login_data.js_code[:10]}...")
                 session_info = {
-                    "openid": f"dev_openid_{login_data.js_code[-8:]}",
+                    "openid": "dev_openid_fixed_development_user",  # 固定开发环境用户
                     "session_key": "dev_session_key",
                     "unionid": None
                 }

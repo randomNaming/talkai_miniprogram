@@ -29,8 +29,13 @@ App({
     // Initialize services
     this.initServices();
     
-    // Initialize vocabulary sync manager
-    this.initVocabSync();
+    // Skip sync initialization in development
+    const isDevelopment = wx.getSystemInfoSync && wx.getSystemInfoSync().platform === 'devtools';
+    if (!isDevelopment) {
+      this.checkAuthAndInitSync();
+    } else {
+      console.log('[App] 开发环境：跳过词汇同步初始化');
+    }
   },
 
   setupErrorHandlers: function() {
@@ -82,6 +87,63 @@ App({
     
     // Load conversation history
     this.loadConversationHistory();
+  },
+
+  // Check authentication and initialize sync
+  checkAuthAndInitSync: function() {
+    const storage = require('./utils/storage');
+    const api = require('./services/api');
+    
+    const token = storage.getToken();
+    
+    if (!token) {
+      console.log('[App] No token found, performing login first');
+      this.performAutoLogin().then(() => {
+        this.initVocabSync();
+      }).catch(err => {
+        console.error('[App] Auto login failed, skipping sync init:', err);
+      });
+    } else {
+      // Verify token validity
+      console.log('[App] Verifying existing token');
+      api.auth.verifyToken().then(() => {
+        console.log('[App] Token valid, initializing sync');
+        this.initVocabSync();
+      }).catch(err => {
+        console.log('[App] Token invalid, performing re-login');
+        storage.setToken(''); // Clear invalid token
+        this.performAutoLogin().then(() => {
+          this.initVocabSync();
+        }).catch(loginErr => {
+          console.error('[App] Re-login failed, skipping sync init:', loginErr);
+        });
+      });
+    }
+  },
+
+  // Perform automatic login
+  performAutoLogin: function() {
+    const api = require('./services/api');
+    
+    return new Promise((resolve, reject) => {
+      wx.login({
+        success: (loginRes) => {
+          if (loginRes.code) {
+            api.auth.wechatLogin({
+              js_code: loginRes.code
+            }).then(result => {
+              return api.user.getProfile();
+            }).then(userInfo => {
+              this.login(userInfo);
+              resolve();
+            }).catch(reject);
+          } else {
+            reject(new Error('Failed to get WeChat login code'));
+          }
+        },
+        fail: reject
+      });
+    });
   },
 
   // Initialize vocabulary sync manager
