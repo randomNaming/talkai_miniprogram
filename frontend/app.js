@@ -20,7 +20,8 @@ App({
       vocabList: [],
       vocabStats: null,
       lastSyncTime: null,
-      vocabSyncManager: vocabSyncManager
+      vocabSyncManager: vocabSyncManager,
+      needRefreshVocab: false
     };
     
     // Check login status
@@ -29,13 +30,16 @@ App({
     // Initialize services
     this.initServices();
     
+    // 暂时完全禁用词汇同步初始化，避免循环调用问题
+    console.log('[App] 暂时禁用词汇同步初始化');
+    
     // Skip sync initialization in development
-    const isDevelopment = wx.getSystemInfoSync && wx.getSystemInfoSync().platform === 'devtools';
-    if (!isDevelopment) {
-      this.checkAuthAndInitSync();
-    } else {
-      console.log('[App] 开发环境：跳过词汇同步初始化');
-    }
+    // const isDevelopment = wx.getSystemInfoSync && wx.getSystemInfoSync().platform === 'devtools';
+    // if (!isDevelopment) {
+    //   this.checkAuthAndInitSync();
+    // } else {
+    //   console.log('[App] 开发环境：跳过词汇同步初始化');
+    // }
   },
 
   setupErrorHandlers: function() {
@@ -54,10 +58,10 @@ App({
     // App is brought to foreground
     console.log('App shown');
     
-    // Trigger sync when app resumes from background
-    if (this.globalData.vocabSyncManager) {
-      this.globalData.vocabSyncManager.syncOnAppResume();
-    }
+    // 完全禁用应用恢复时的词汇同步，避免循环调用
+    // if (this.globalData.vocabSyncManager) {
+    //   this.globalData.vocabSyncManager.syncOnAppResume();
+    // }
   },
 
   onHide: function () {
@@ -187,24 +191,27 @@ App({
     };
   },
 
-  // Refresh pages that display vocabulary data
+  // Refresh pages that display vocabulary data (完全禁用避免循环调用)
   refreshVocabPages: function(vocabData) {
-    try {
-      // Get current pages stack
-      const pages = getCurrentPages();
-      const currentPage = pages[pages.length - 1];
-      
-      // Refresh vocab page if it's currently active
-      if (currentPage && currentPage.route === 'pages/vocab/vocab') {
-        if (typeof currentPage.loadVocabList === 'function') {
-          currentPage.loadVocabList();
-        }
-      }
-      
-      console.log('Vocabulary pages refreshed with new data');
-    } catch (error) {
-      console.error('Failed to refresh vocabulary pages:', error);
-    }
+    console.log('[App] refreshVocabPages 已禁用，避免循环调用');
+    return;
+    
+    // try {
+    //   // Get current pages stack
+    //   const pages = getCurrentPages();
+    //   const currentPage = pages[pages.length - 1];
+    //   
+    //   // Refresh vocab page if it's currently active
+    //   if (currentPage && currentPage.route === 'pages/vocab/vocab') {
+    //     if (typeof currentPage.loadVocabList === 'function') {
+    //       currentPage.loadVocabList();
+    //     }
+    //   }
+    //   
+    //   console.log('Vocabulary pages refreshed with new data');
+    // } catch (error) {
+    //   console.error('Failed to refresh vocabulary pages:', error);
+    // }
   },
 
   // Load cached vocabulary from local storage
@@ -312,9 +319,29 @@ App({
     
     console.log('Vocab word added/updated:', word.word);
     
-    // Trigger cache refresh after vocabulary operation
-    if (this.globalData.vocabSyncManager) {
-      this.globalData.vocabSyncManager.refreshAfterVocabOperation('word_add');
+    // 通知词汇页面有新词汇添加
+    this.notifyVocabPageUpdate();
+  },
+
+  // 通知词汇页面更新（不触发同步，只刷新显示）
+  notifyVocabPageUpdate: function() {
+    try {
+      const pages = getCurrentPages();
+      const currentPage = pages[pages.length - 1];
+      
+      // 如果当前就在词汇页面，立即刷新
+      if (currentPage && currentPage.route === 'pages/vocab/vocab') {
+        if (typeof currentPage.loadRecentVocabulary === 'function') {
+          console.log('[App] 当前在词汇页面，立即刷新词汇列表');
+          currentPage.loadRecentVocabulary();
+        }
+      } else {
+        // 如果不在词汇页面，设置标记，当切换到词汇页面时刷新
+        this.globalData.needRefreshVocab = true;
+        console.log('[App] 设置词汇页面刷新标记');
+      }
+    } catch (error) {
+      console.error('Failed to notify vocab page update:', error);
     }
   },
 

@@ -137,7 +137,13 @@ class VocabLoader:
     def _update_existing_word(self, vocab_item: VocabItem, grade: str) -> None:
         """更新现有词汇的source和level（复制 talkai_py 逻辑）"""
         vocab_item.source = "level_vocab"
-        vocab_item.level = grade
+        
+        # 使用与JSON文件一致的level格式
+        if grade in ["CET4", "CET6"]:
+            vocab_item.level = f"college({grade})"
+        else:
+            vocab_item.level = grade.lower().replace(" ", "_")
+            
         vocab_item.updated_at = datetime.utcnow()
     
     def load_vocab_by_grade(self, user_id: str, db: Session) -> bool:
@@ -193,8 +199,13 @@ class VocabLoader:
                 logger.info(f"使用TXT格式文件: {txt_filename}")
                 words_from_txt = self._read_txt_words(txt_file_path)
                 if words_from_txt:
-                    # 转换为词汇项格式
-                    vocab_items = [{"word": word, "source": "level_vocab", "level": grade, 
+                    # 转换为词汇项格式，使用与JSON文件一致的level格式
+                    if grade in ["CET4", "CET6"]:
+                        db_level = f"college({grade})"  # 与JSON文件格式一致
+                    else:
+                        db_level = grade.lower().replace(" ", "_")
+                    
+                    vocab_items = [{"word": word, "source": "level_vocab", "level": db_level, 
                                   "wrong_use_count": 0, "right_use_count": 0, "isMastered": False,
                                   "added_date": datetime.utcnow().isoformat(), "last_used": ""}
                                  for word in words_from_txt]

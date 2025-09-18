@@ -174,6 +174,7 @@ async def update_user_profile(
                 
                 # 先提交清空操作
                 db.commit()
+                db.refresh(user)
                 
                 # 3. 根据新grade初始化词汇库
                 vocab_success = vocab_loader.load_vocab_by_grade(user_id, db)
@@ -739,12 +740,37 @@ async def get_vocab_status(
         
         # 获取各等级词汇数量
         level_vocab_counts = {}
+        
         for level in added_vocab_levels:
-            count = db.query(VocabItem).filter(
-                VocabItem.user_id == user_id,
-                VocabItem.level == level,
-                VocabItem.is_active == True
-            ).count()
+            count = 0
+            
+            # 定义多种可能的数据库格式
+            possible_formats = [
+                level,  # 原格式 "CET4"
+                level.lower().replace(" ", "_"),  # 小写下划线 "cet4"
+                f"college({level})",  # college格式 "college(CET4)"
+                level.lower(),  # 纯小写 "cet4"
+            ]
+            
+            # 如果是Primary School等，添加更多格式
+            if " " in level:
+                possible_formats.append(level.lower().replace(" ", "_"))  # "primary_school"
+            
+            # 尝试所有可能的格式
+            for db_format in possible_formats:
+                count = db.query(VocabItem).filter(
+                    VocabItem.user_id == user_id,
+                    VocabItem.level == db_format,
+                    VocabItem.is_active == True
+                ).count()
+                
+                if count > 0:
+                    # logger.info(f"Level {level} found with format: {db_format}, count: {count}")  # 减少日志输出
+                    break
+            
+            if count == 0:
+                logger.warning(f"Level {level} not found with any format: {possible_formats}")
+            
             level_vocab_counts[level] = count
         
         return {

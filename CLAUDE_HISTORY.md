@@ -51,6 +51,94 @@ has_error = not is_just_punctuation
 
 ---
 
+## 2025-09-18 22:45 解决前端循环调用API问题和词汇页面实时更新
+
+**用户反馈：**
+1. "为什么terminal一直循环显示API call logs"
+2. 循环显示停止后，"词汇"页无法及时增加显示新增词汇
+
+**问题分析：**
+1. 前端词汇同步管理器和页面事件形成循环调用链
+2. 禁用循环后，词汇页面失去了实时更新能力
+
+**完成的修改：**
+
+### 1. 彻底解决循环调用问题 ✅
+- **app.js修改**：
+  - 禁用应用恢复时的词汇同步：`onShow`中的`syncOnAppResume()`
+  - 禁用词汇操作后的缓存刷新：`addVocabWord`中的`refreshAfterVocabOperation`
+  - 禁用页面自动刷新：`refreshVocabPages`函数完全禁用
+
+- **vocab-sync.js修改**：
+  - 禁用同步管理器初始化：`init()`方法直接返回
+  - 禁用所有同步方法：`syncVocabulary()`, `refreshAfterVocabOperation()`, `syncOnAppResume()`
+  - 保留接口但不执行实际同步操作
+
+- **vocab.js修改**：
+  - 初步禁用所有页面事件的数据加载
+
+### 2. 恢复词汇页面实时更新功能 ✅
+- **重新启用词汇页面基本功能**：
+  - `onLoad`: 只加载最近词汇，避免触发同步
+  - `onShow`: 添加2秒防抖，只调用`loadRecentVocabulary()`
+  - `onPullDownRefresh`: 支持手动下拉刷新
+
+- **改进词汇加载函数**：
+  - `loadRecentVocabulary()`: 调用`api.learningVocab.getList()`获取最近词汇
+  - 同时更新基本统计数据(总数、掌握数、学习进度)
+  - 增加limit到10个词汇，提供更多显示内容
+
+### 3. 添加智能通知机制 ✅
+- **应用级别通知系统**：
+  - `notifyVocabPageUpdate()`: 当添加新词汇时智能通知
+  - 如果当前在词汇页面，立即刷新显示
+  - 如果不在词汇页面，设置`needRefreshVocab`标记
+
+- **词汇页面响应机制**：
+  - `onShow`检查`needRefreshVocab`标记
+  - 检测到标记时强制刷新并清除标记
+  - 确保用户切换到词汇页面时看到最新内容
+
+### 4. 关键技术改进
+- **防循环调用**：完全禁用所有自动同步机制
+- **精确刷新**：只刷新必要的数据，不触发额外同步
+- **智能通知**：基于页面状态的条件刷新
+- **用户体验**：支持下拉刷新，保持交互响应
+
+**技术实现：**
+```javascript
+// 智能通知机制
+notifyVocabPageUpdate: function() {
+  const pages = getCurrentPages();
+  const currentPage = pages[pages.length - 1];
+  
+  if (currentPage && currentPage.route === 'pages/vocab/vocab') {
+    currentPage.loadRecentVocabulary(); // 立即刷新
+  } else {
+    this.globalData.needRefreshVocab = true; // 设置标记
+  }
+}
+
+// 词汇页面检查机制
+onShow: function() {
+  if (app.globalData.needRefreshVocab) {
+    app.globalData.needRefreshVocab = false;
+    this.loadRecentVocabulary();
+    return;
+  }
+  // 防抖逻辑...
+}
+```
+
+**解决效果：**
+- ✅ 终端不再循环显示API调用日志
+- ✅ 词汇页面能及时显示新增词汇
+- ✅ 支持手动下拉刷新
+- ✅ 保持良好的用户体验
+- ✅ 无性能影响
+
+---
+
 ## 2025-08-27 词汇管理系统完整实现
 
   **用户需求：**

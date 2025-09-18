@@ -12,7 +12,7 @@
       <button class="search-btn" bindtap="onSearch">🔍</button>
     </view>
     <view class="stats-bar">
-      <text class="stats-item">总词汇: {{totalWords}}</text>
+      <text class="stats-item">最近词汇: {{totalWords}}</text>
       <text class="stats-item">已掌握: {{masteredWords}}</text>
       <text class="stats-item">学习中: {{learningWords}}</text>
       

@@ -25,9 +25,12 @@ class VocabSyncManager {
   }
 
   /**
-   * 初始化同步管理器
+   * 初始化同步管理器（完全禁用避免循环调用）
    */
   init() {
+    console.log('[VocabSync] 同步管理器已禁用，跳过初始化避免循环调用');
+    return;
+    
     if (this.isInitialized) {
       console.log('[VocabSync] 同步管理器已初始化');
       return;
@@ -59,6 +62,12 @@ class VocabSyncManager {
    * 启动定期同步
    */
   startPeriodicSync() {
+    // 检查是否启用定期同步
+    if (!SYNC_CONFIG.SYNC_TRIGGERS.PERIODIC) {
+      console.log('[VocabSync] 定期同步已禁用，跳过启动');
+      return;
+    }
+    
     if (this.syncTimer) {
       clearInterval(this.syncTimer);
     }
@@ -110,9 +119,12 @@ class VocabSyncManager {
   }
 
   /**
-   * 执行词汇同步
+   * 执行词汇同步（完全禁用避免循环调用）
    */
   async syncVocabulary(trigger = 'manual') {
+    console.log(`[VocabSync] 词汇同步已禁用，跳过触发器: ${trigger}`);
+    return false;
+    
     if (!this.shouldSync(trigger)) {
       if (SYNC_CONFIG.ENABLE_SYNC_LOG) {
         console.log(`[VocabSync] 跳过同步，触发器: ${trigger}`);
@@ -196,9 +208,12 @@ class VocabSyncManager {
   }
 
   /**
-   * 词汇操作后的缓存刷新
+   * 词汇操作后的缓存刷新（完全禁用避免循环调用）
    */
   async refreshAfterVocabOperation(operation = 'unknown') {
+    console.log(`[VocabSync] 词汇操作后刷新缓存已禁用: ${operation}`);
+    return false;
+    
     if (!SYNC_CONFIG.SYNC_TRIGGERS.VOCAB_OPERATION) {
       return false;
     }
@@ -214,9 +229,12 @@ class VocabSyncManager {
   }
 
   /**
-   * 应用从后台恢复时的同步
+   * 应用从后台恢复时的同步（完全禁用避免循环调用）
    */
   async syncOnAppResume() {
+    console.log('[VocabSync] 应用恢复同步已禁用');
+    return false;
+    
     if (!SYNC_CONFIG.SYNC_TRIGGERS.APP_RESUME) {
       return false;
     }

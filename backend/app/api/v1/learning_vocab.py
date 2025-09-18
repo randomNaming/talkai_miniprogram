@@ -66,7 +66,7 @@ async def get_learning_vocabulary(
         
         # Apply filters
         if is_mastered is not None:
-            query = query.filter(VocabItem.is_mastered == is_mastered)
+            query = query.filter(VocabItem.isMastered == is_mastered)
         
         if level:
             query = query.filter(VocabItem.level == level)
@@ -94,15 +94,15 @@ async def get_learning_vocabulary(
                 word=item.word,
                 level=item.level or "none",
                 source=item.source or "level_vocab",
-                added_date=item.created_at.strftime("%Y-%m-%d") if item.created_at else date.today().strftime("%Y-%m-%d"),
+                added_date=item.added_date.strftime("%Y-%m-%d") if item.added_date else date.today().strftime("%Y-%m-%d"),
                 is_mastered=item.is_mastered,
                 right_use_count=item.correct_count,
                 wrong_use_count=max(0, item.encounter_count - item.correct_count),
-                last_used=item.last_reviewed.strftime("%Y-%m-%d") if item.last_reviewed else None
+                last_used=item.last_used.strftime("%Y-%m-%d") if item.last_used else None
             )
             learning_vocab.append(learning_vocab_item)
         
-        logger.info(f"Retrieved {len(learning_vocab)} learning vocabulary items for user {user_id}")
+        # logger.info(f"Retrieved {len(learning_vocab)} learning vocabulary items for user {user_id}")  # 减少日志输出
         return learning_vocab
         
     except Exception as e:
@@ -133,7 +133,7 @@ async def get_learning_vocabulary_stats(
         mastered_count = db.query(VocabItem).filter(
             VocabItem.user_id == user_id,
             VocabItem.is_active == True,
-            VocabItem.is_mastered == True
+            VocabItem.isMastered == True
         ).count()
         
         # Sources breakdown
@@ -245,7 +245,7 @@ async def get_unmastered_vocabulary(
         vocab_items = db.query(VocabItem).filter(
             VocabItem.user_id == user_id,
             VocabItem.is_active == True,
-            VocabItem.is_mastered == False
+            VocabItem.isMastered == False
         ).order_by(VocabItem.updated_at.desc()).limit(limit).all()
         
         # Convert to learning vocab format
@@ -255,11 +255,11 @@ async def get_unmastered_vocabulary(
                 word=item.word,
                 level=item.level or "none",
                 source=item.source or "level_vocab",
-                added_date=item.created_at.strftime("%Y-%m-%d") if item.created_at else date.today().strftime("%Y-%m-%d"),
+                added_date=item.added_date.strftime("%Y-%m-%d") if item.added_date else date.today().strftime("%Y-%m-%d"),
                 is_mastered=item.is_mastered,
                 right_use_count=item.correct_count,
                 wrong_use_count=max(0, item.encounter_count - item.correct_count),
-                last_used=item.last_reviewed.strftime("%Y-%m-%d") if item.last_reviewed else None
+                last_used=item.last_used.strftime("%Y-%m-%d") if item.last_used else None
             )
             unmastered_vocab.append(learning_vocab_item)
         
@@ -335,7 +335,7 @@ async def export_learning_vocabulary(
         vocab_items = db.query(VocabItem).filter(
             VocabItem.user_id == user_id,
             VocabItem.is_active == True
-        ).order_by(VocabItem.created_at.desc()).all()
+        ).order_by(VocabItem.added_date.desc()).all()
         
         # Convert to learning vocab format (matching talkai_py exactly)
         learning_vocab = []
@@ -344,11 +344,11 @@ async def export_learning_vocabulary(
                 word=item.word,
                 level=item.level or "none",
                 source=item.source or "level_vocab",
-                added_date=item.created_at.strftime("%Y-%m-%d") if item.created_at else date.today().strftime("%Y-%m-%d"),
+                added_date=item.added_date.strftime("%Y-%m-%d") if item.added_date else date.today().strftime("%Y-%m-%d"),
                 is_mastered=item.is_mastered,
                 right_use_count=item.correct_count,
                 wrong_use_count=max(0, item.encounter_count - item.correct_count),
-                last_used=item.last_reviewed.strftime("%Y-%m-%d") if item.last_reviewed else None
+                last_used=item.last_used.strftime("%Y-%m-%d") if item.last_used else None
             )
             learning_vocab.append(learning_vocab_item)
         

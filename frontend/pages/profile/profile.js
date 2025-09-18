@@ -134,6 +134,11 @@ Page({
           updateData[key].usage_hours = Math.floor(data.total_usage_time / 3600);
         }
         
+        // 如果是vocabStatus数据，计算掌握率百分比
+        if (key === 'vocabStatus' && data && data.mastery_percentage !== undefined) {
+          updateData[key].mastery_percentage_display = Math.floor(data.mastery_percentage);
+        }
+        
         this.setData(updateData);
       }).catch(err => {
         console.error(`Failed to load ${key}:`, err);
@@ -158,7 +163,14 @@ Page({
    * Load vocabulary status
    */
   loadVocabStatus: function() {
-    this.loadWithRetry('vocabStatus', () => api.user.getVocabStatus());
+    this.loadWithRetry('vocabStatus', () => {
+      return api.user.getVocabStatus().then(data => {
+        console.log('[Profile] 词汇状态API返回:', data);
+        console.log('[Profile] added_vocab_levels:', data.added_vocab_levels);
+        console.log('[Profile] level_vocab_counts:', data.level_vocab_counts);
+        return data;
+      });
+    });
   },
   
   /**
@@ -464,6 +476,11 @@ Page({
       
       // Reload data to get updated vocab status
       this.loadUserData();
+      
+      // 词汇状态会在loadUserData中自动加载，暂时禁用额外的延迟刷新
+      // setTimeout(() => {
+      //   this.loadVocabStatus();
+      // }, 1000);
       
     }).catch(err => {
       wx.hideLoading();

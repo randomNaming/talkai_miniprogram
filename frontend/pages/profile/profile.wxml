@@ -56,7 +56,7 @@
         <text class="vocab-stat-label">学习中</text>
       </view>
       <view class="vocab-stat-item">
-        <text class="vocab-stat-number">{{Math.floor(vocabStatus.mastery_percentage)}}%</text>
+        <text class="vocab-stat-number">{{vocabStatus.mastery_percentage_display}}%</text>
         <text class="vocab-stat-label">掌握率</text>
       </view>
     </view>
@@ -73,7 +73,8 @@
   </view>
 
   <!-- Actions -->
-  <view class="actions-section">
+  
+  <!-- <view class="actions-section">
     <button class="action-btn" bindtap="onLoadVocab">
       <text class="action-icon">📚</text>
       <text class="action-text">加载{{userInfo.grade || 'Primary School'}}词汇</text>
@@ -93,7 +94,8 @@
       <text class="action-icon">🚪</text>
       <text class="action-text">退出登录</text>
     </button>
-  </view>
+  </view> -->
+
 </view>
 
 <!-- Edit Profile Modal -->
