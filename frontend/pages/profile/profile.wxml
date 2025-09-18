@@ -29,7 +29,7 @@
         <text class="stat-label">学习词汇</text>
       </view> -->
       <view class="stat-item">
-        <text class="stat-number">{{Math.floor(stats.total_usage_time / 3600)}}</text>
+        <text class="stat-number">{{stats.usage_hours}}</text>
         <text class="stat-label">学习时长(小时)</text>
       </view>
       <view class="stat-item">

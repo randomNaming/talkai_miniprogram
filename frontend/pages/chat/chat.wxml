@@ -3,7 +3,7 @@
   <!-- Header -->
   <view class="chat-header">
     <view class="header-content">
-      <view class="chat-title">Chat</view>
+      <view class="chat-title">  Chat </view>
       <view class="chat-status">
         <text class="status-dot {{isOnline ? 'online' : 'offline'}}"></text>
         <text class="status-text">{{isOnline ? '小Y在线' : '连接中...'}}</text>

@@ -363,3 +363,65 @@ has_error = not is_just_punctuation
   - 内存缓存和批量保存机制稳定运行，支持30秒自动保存
   - 学习进度可视化提供完整的学习数据洞察和用户激励
 
+2025-09-18 18:27 - 修改对话页面布局：实现固定页眉和输入框，中间消息区域可滚动
+
+## 本次任务
+修改前端对话页面：上下拖动页面时候不要动输入框和最上面的页眉（写有小Y在线的那部分）。
+
+## 实现方案
+1. 页眉(.chat-header)：
+   - 添加 position: fixed, top: 0, z-index: 100
+   - 适配安全区域：padding-top: calc(20rpx + env(safe-area-inset-top))
+
+2. 消息容器(.messages-container)：
+   - 添加上下边距：margin-top 和 margin-bottom 
+   - 设置 overflow-y: auto 使其可滚动
+
+3. 输入区域(.input-area)：
+   - 添加 position: fixed, bottom: 0, z-index: 100
+   - 适配安全区域：padding-bottom: calc(24rpx + env(safe-area-inset-bottom))
+
+## 修改的文件
+- /Users/pean/aiproject/talkai_mini/frontend/pages/chat/chat.wxss
+
+## 效果
+- 页眉小Y在线部分固定在顶部
+- 输入框固定在底部  
+- 只有中间的消息列表区域可以滚动
+- 支持iPhone等设备的安全区域适配
+
+## 测试建议
+在微信开发者工具中测试滚动效果，确认页眉和输入框保持固定位置。
+
+2025-09-18 19:09 - 修复Profile页面学习统计显示问题
+
+## 问题分析
+从用户截图可以看出：
+1. 学习时长显示为学习时长(小时)而没有显示具体数字
+2. 三个统计项（对话次数、学习时长、加入天数）没有对齐
+
+## 根本原因
+1. 学习时长数字缺失：模板中使用了Math.floor函数，但微信小程序不支持在模板中直接调用JavaScript函数
+2. 对齐问题：CSS布局使用space-around导致间距不均匀，且缺少flex布局优化
+
+## 解决方案
+### 1. 修复数字显示问题
+- 在profile.js的data中添加usage_hours字段
+- 在loadWithRetry函数中计算小时数
+- 在profile.wxml中使用计算好的usage_hours值
+
+### 2. 修复对齐问题
+- 修改.stats-grid为justify-content: space-between
+- 优化.stat-item的flex布局
+- 添加word-break和white-space样式防止文字换行
+
+## 修改的文件
+- frontend/pages/profile/profile.js
+- frontend/pages/profile/profile.wxml
+- frontend/pages/profile/profile.wxss
+
+## 预期效果
+- 学习时长将正确显示数字
+- 三个统计项目完美对齐，间距均匀
+- 标签文字不会换行导致对齐问题
+

@@ -9,7 +9,8 @@ Page({
       total_usage_time: 0,
       chat_history_count: 0,
       vocab_count: 0,
-      days_since_registration: 0
+      days_since_registration: 0,
+      usage_hours: 0
     },
     vocabStatus: {},
     availableGrades: [],
@@ -127,6 +128,12 @@ Page({
       apiCall().then(data => {
         const updateData = {};
         updateData[key] = data;
+        
+        // 如果是stats数据，计算小时数
+        if (key === 'stats' && data && data.total_usage_time) {
+          updateData[key].usage_hours = Math.floor(data.total_usage_time / 3600);
+        }
+        
         this.setData(updateData);
       }).catch(err => {
         console.error(`Failed to load ${key}:`, err);

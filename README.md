@@ -1,310 +1,398 @@
-# TalkAI - AI英语学习微信小程序
+# TalkAI Mini - AI英语学习微信小程序
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.8+-green.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.68+-red.svg)](https://fastapi.tiangolo.com)
 [![WeChat](https://img.shields.io/badge/WeChat-Mini%20Program-green.svg)](https://developers.weixin.qq.com/miniprogram/dev/framework/)
 
-一个基于AI的英语学习微信小程序，提供智能对话练习、语法纠正、词汇管理和词典查询功能。
+一个基于AI的英语学习微信小程序，提供智能对话练习、语法纠正、词汇管理和词典查询功能。从桌面版本talkai_py移植而来，保持原有的命名规则、逻辑和功能。
 
-## 功能特性
+## 🚀 功能特性
 
-### 🤖 AI智能对话
-- **智能语音识别** - 支持语音输入，自动转换为文字
-- **实时对话练习** - 与AI进行英语对话，提升口语能力
-- **语法纠正** - 自动检测并纠正语法错误
-- **学习分析** - 生成个性化学习报告和建议
+### 🤖 AI智能对话练习
+- **实时对话** - 与AI进行自然英语对话，提升口语表达
+- **语法纠正** - 自动检测语法错误并提供修正建议
+- **词汇推荐** - 基于对话内容智能推荐学习词汇
+- **学习分析** - 生成个性化学习报告和改进建议
 
-### 📚 词汇管理
-- **个人词汇本** - 收藏和管理学习过的单词
-- **智能复习** - 基于遗忘曲线的复习提醒
-- **词汇统计** - 学习进度和掌握程度分析
-- **分类管理** - 按主题或难度分类词汇
+### 📚 个人词汇管理
+- **智能词汇库** - 自动收集AI纠错和词典查询的词汇
+- **学习进度** - 跟踪词汇掌握度和学习统计
+- **分级词汇** - 按学习等级(小学/中学/CET4/CET6等)加载词汇
+- **复习系统** - 基于使用频率的智能复习提醒
 
-### 🔍 词典查询
-- **海量词库** - 40万词汇数据库支持
-- **详细释义** - 包含发音、词性、例句等完整信息
-- **离线查询** - 本地数据库，无需网络连接
-- **查询历史** - 自动保存查询记录
+### 🔍 在线词典查询
+- **海量词库** - 40万英文词汇数据库支持
+- **详细释义** - 包含音标、词性、中文释义等完整信息
+- **一键收藏** - 查词后可直接添加到个人词汇库
+- **模糊搜索** - 支持拼写容错和智能匹配
 
-### 👤 用户系统
-- **微信登录** - 一键授权登录，无需注册
-- **学习档案** - 完整的学习历史和进度跟踪
-- **个性化设置** - 学习目标和偏好配置
-- **数据同步** - 多设备数据云端同步
+### 👤 用户个人中心
+- **微信一键登录** - 无需注册，微信授权即可使用
+- **学习档案** - 完整的使用统计和学习历史
+- **个性化设置** - 年级、年龄等学习偏好配置
+- **词汇状态** - 实时显示词汇库统计和掌握情况
 
-## 技术架构
+## 📁 项目结构详解
 
-### 后端技术栈
-- **Python 3.8+** - 核心开发语言
-- **FastAPI** - 高性能Web框架
-- **SQLAlchemy** - ORM数据库操作
-- **SQLite** - 轻量级数据库
-- **Redis** - 缓存和会话管理
-- **Docker** - 容器化部署
-- **Nginx** - 反向代理和负载均衡
-
-### 前端技术栈
-- **微信小程序** - 原生小程序开发
-- **JavaScript ES6+** - 核心逻辑开发
-- **WXML/WXSS** - 页面结构和样式
-- **WeChat API** - 微信官方接口集成
-
-### AI服务集成
-- **Moonshot AI** - 主要AI对话服务（推荐）
-- **OpenAI GPT** - 备选AI服务
-- **智能语音识别** - 语音转文字功能
-- **自然语言处理** - 语法分析和纠错
-
-## 项目结构
+### 前端架构 (`frontend/`)
 
 ```
-talkai_miniprogram/
-├── frontend/                 # 微信小程序前端
-│   ├── pages/               # 页面文件
-│   │   ├── chat/           # 聊天对话页面
-│   │   ├── vocab/          # 词汇管理页面
-│   │   ├── dict/           # 词典查询页面
-│   │   ├── profile/        # 个人中心页面
-│   │   └── login/          # 登录页面
-│   ├── services/           # API接口服务
-│   ├── utils/              # 工具函数
-│   ├── components/         # 自定义组件
-│   └── images/             # 图片资源
+frontend/
+├── app.js                    # 全局应用入口，用户状态管理，词汇同步初始化
+├── app.json                  # 微信小程序配置，页面路由，TabBar设置
+├── app.wxss                  # 全局样式定义
+├── project.config.json       # 微信开发者工具项目配置
 │
-├── backend/                  # Python FastAPI后端
-│   ├── app/                # 应用核心代码
-│   │   ├── api/v1/         # API路由端点
-│   │   ├── core/           # 核心配置
-│   │   ├── models/         # 数据模型
-│   │   ├── services/       # 业务逻辑
-│   │   └── utils/          # 工具函数
-│   ├── data/               # 数据文件
-│   │   └── db/             # 数据库文件
-│   ├── logs/               # 日志文件
-│   └── tests/              # 测试代码
+├── pages/                    # 核心页面模块
+│   ├── chat/                # 聊天对话页面
+│   │   ├── chat.js          # 对话逻辑，AI交互，语法纠错，词汇添加
+│   │   ├── chat.wxml        # 对话界面布局，消息列表，输入框
+│   │   └── chat.wxss        # 对话样式，消息气泡，动画效果
+│   │
+│   ├── vocab/               # 词汇管理页面
+│   │   ├── vocab.js         # 词汇列表逻辑，过滤最近学习词汇，学习进度
+│   │   ├── vocab.wxml       # 词汇列表界面，统计展示，搜索功能
+│   │   └── vocab.wxss       # 词汇页面样式，进度条，词汇卡片
+│   │
+│   ├── dict/                # 词典查询页面
+│   │   ├── dict.js          # 词典搜索逻辑，词汇查询，添加到词汇库
+│   │   ├── dict.wxml        # 搜索界面，查询结果展示
+│   │   └── dict.wxss        # 词典页面样式，搜索框，结果列表
+│   │
+│   ├── profile/             # 个人中心页面
+│   │   ├── profile.js       # 用户信息管理，设置编辑，词汇状态显示
+│   │   ├── profile.wxml     # 个人信息界面，设置表单，统计展示
+│   │   └── profile.wxss     # 个人中心样式，表单设计，数据展示
+│   │
+│   └── login/               # 登录页面
+│       ├── login.js         # 微信登录逻辑，用户认证流程
+│       ├── login.wxml       # 登录界面，授权按钮
+│       └── login.wxss       # 登录页面样式
 │
-├── deployment/               # 部署脚本和配置
-├── docs/                    # 项目文档
-└── README.md               # 项目说明
+├── services/                # API服务层
+│   ├── api.js               # 核心HTTP客户端，JWT认证，错误处理，所有API端点
+│   └── vocab-sync.js        # 词汇数据同步管理器，定期同步，缓存策略
+│
+├── utils/                   # 工具函数库
+│   └── storage.js           # 本地存储封装，token管理，离线缓存
+│
+└── config/                  # 配置文件
+    ├── env.js               # 环境检测，API地址自动切换(本地/生产)
+    └── sync.js              # 词汇同步配置，同步间隔，触发条件
 ```
 
-## 快速开始
+### 后端架构 (`backend/`)
 
-### 环境要求
+```
+backend/
+├── main.py                   # FastAPI应用入口，路由配置，CORS设置
+├── requirements.txt          # Python依赖包列表
+├── .env                      # 环境变量配置
+├── docker-compose.yml        # Docker容器编排配置
+├── Dockerfile               # Python应用容器构建
+│
+├── app/                     # 核心应用代码
+│   ├── __init__.py
+│   │
+│   ├── api/v1/             # API路由端点
+│   │   ├── __init__.py
+│   │   ├── auth.py         # 微信登录认证，JWT token管理，用户注册
+│   │   ├── chat.py         # AI对话接口，语法检查，词汇建议生成
+│   │   ├── dict.py         # 词典查询接口，40万词库搜索，词汇释义
+│   │   ├── learning_vocab.py # 学习词汇管理，个人词汇CRUD，统计分析
+│   │   ├── sync.py         # 数据同步接口，前后端数据一致性
+│   │   ├── user.py         # 用户信息管理，档案设置，学习统计
+│   │   └── vocab.py        # 词汇库操作，批量管理，导入导出
+│   │
+│   ├── core/               # 核心配置模块
+│   │   ├── __init__.py
+│   │   ├── config.py       # 应用配置，环境变量，安全设置
+│   │   ├── database.py     # 数据库连接，SQLAlchemy配置，会话管理
+│   │   └── security.py     # JWT认证，密码加密，安全中间件
+│   │
+│   ├── models/             # 数据模型定义
+│   │   ├── __init__.py
+│   │   ├── user.py         # 用户模型，个人档案，使用统计
+│   │   ├── vocab.py        # 词汇模型，学习统计，掌握度跟踪
+│   │   └── chat.py         # 聊天记录模型，对话历史，会话管理
+│   │
+│   ├── services/           # 业务逻辑服务
+│   │   ├── __init__.py
+│   │   ├── ai.py           # AI服务集成，Moonshot/OpenAI，对话生成
+│   │   ├── dictionary.py   # 词典服务，词汇查询，释义获取
+│   │   ├── learning_analysis.py # 学习分析，进度统计，报告生成
+│   │   ├── vocabulary.py   # 词汇管理服务，语义相似度，掌握度计算
+│   │   ├── vocabulary_embedding.py # 词汇向量化，语义搜索
+│   │   ├── vocab_loader.py # 分级词汇加载，初始化用户词汇库
+│   │   └── wechat.py      # 微信API集成，登录验证，用户信息获取
+│   │
+│   └── utils/              # 工具函数库
+│       ├── __init__.py
+│       ├── prompts.py      # AI提示词模板，对话引导，语法检查
+│       └── text_utils.py   # 文本处理，词汇提取，中英文检测
+│
+├── data/                   # 数据存储
+│   ├── db/                # 数据库文件
+│   │   ├── talkai.db      # 主数据库(用户,词汇,聊天记录)
+│   │   └── dictionary400k.db # 词典数据库(40万英文词汇)
+│   │
+│   └── level_words/       # 分级词汇文件
+│       ├── primary_school_all.json    # 小学词汇(439词)
+│       ├── middle_school_all.json     # 中学词汇
+│       ├── high_school_all.json       # 高中词汇
+│       ├── cet4_all.json             # CET4词汇
+│       └── cet6_all.json             # CET6词汇
+│
+└── logs/                   # 应用日志
+    └── app.log            # 主要应用日志
+```
 
-- Python 3.8+
-- Docker & Docker Compose
-- Redis
-- 微信开发者工具
-- 有效的AI服务API密钥（Moonshot或OpenAI）
+## 🔧 开发环境设置
 
-### 后端部署
+### 本地开发模式
 
-1. **克隆项目**
+**后端启动：**
 ```bash
-git clone https://github.com/username/talkai_miniprogram.git
-cd talkai_miniprogram
+# 激活虚拟环境
+source /Users/pean/aiproject/talkai_mini/talkai_py/bookvidenv_new/bin/activate
+
+# 启动后端服务
+cd backend
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-2. **配置环境变量**
+**前端开发：**
+1. 打开微信开发者工具
+2. 导入 `frontend/` 目录
+3. 前端自动检测环境并使用 `http://localhost:8000/api/v1`
+
+**环境自动切换：**
+- **开发环境**：微信开发者工具 → `http://localhost:8000/api/v1`
+- **生产环境**：真实微信环境 → `https://api.jimingge.net/api/v1`
+
+## 📊 数据库结构
+
+### 用户表 (`users`)
+```sql
+- id: 用户唯一标识符(VARCHAR, 主键)
+- openid: 微信OpenID(VARCHAR, 唯一索引)  
+- nickname: 用户昵称
+- grade: 学习等级(Primary School, CET4等)
+- age, gender: 用户基本信息
+- total_usage_time: 总使用时长(秒)
+- chat_history_count: 聊天记录数
+- created_at, last_login_at: 时间戳
+```
+
+### 词汇表 (`vocab_items`)
+```sql
+- id: 词汇条目ID(INTEGER, 主键)
+- user_id: 关联用户ID(外键)
+- word: 单词内容(VARCHAR, 索引)
+- source: 词汇来源('chat_correction', 'lookup', 'level_vocab')
+- level: 难度级别('primary_school', 'cet4'等)
+- wrong_use_count, right_use_count: 使用统计
+- isMastered: 是否已掌握(布尔值)
+- added_date, last_used: 时间戳
+- definition, phonetic, translation: 词汇释义信息
+```
+
+### 聊天记录表 (`chat_sessions`, `chat_messages`)
+```sql
+- 用户对话会话管理
+- 消息内容和AI响应存储
+- 学习分析数据收集
+```
+
+## 🔄 核心工作流程
+
+### 用户认证流程
+1. **微信登录** → `auth.py:wechat_login()` 
+2. **OpenID验证** → 微信API获取用户标识
+3. **JWT生成** → 创建访问令牌(24小时有效期)
+4. **用户初始化** → 新用户自动加载对应等级词汇库
+
+### AI对话学习流程
+1. **用户输入** → `chat.js:onSendMessage()`
+2. **语法检查** → `ai.py:check_vocab_from_input()`
+3. **AI响应生成** → `ai.py:generate_response_natural()`
+4. **词汇分析** → 提取错误词汇，生成学习建议
+5. **手动添加** → 用户点击"+"添加词汇到学习库
+
+### 词汇管理流程
+1. **词汇来源**：
+   - `chat_correction` - AI纠错词汇(用户点+号添加)
+   - `lookup` - 词典查询词汇(词典页面添加)
+   - `level_vocab` - 等级词汇(按grade自动加载)
+2. **掌握度算法** → `right_use_count - wrong_use_count >= 3`
+3. **词汇展示** → 词汇页面只显示最近学习词汇(过滤level_vocab)
+
+### 数据同步机制
+- **开发环境** → 禁用自动同步，避免认证问题
+- **生产环境** → 5分钟定期同步，词汇操作后触发同步
+- **同步范围** → 前端本地缓存 ↔ 后端SQLite数据库
+
+## ⚙️ 关键配置文件
+
+### 前端配置
+
+**`config/env.js`** - 环境检测和API地址切换
+```javascript
+// 自动检测运行环境
+const isDevelopment = wx.getSystemInfoSync().platform === 'devtools';
+const API_BASE_URL = isDevelopment ? 
+  'http://localhost:8000/api/v1' : 
+  'https://api.jimingge.net/api/v1';
+```
+
+**`config/sync.js`** - 词汇同步配置
+```javascript
+SYNC_CONFIG = {
+  VOCAB_SYNC_INTERVAL: 5 * 60 * 1000,  // 5分钟同步
+  SYNC_TRIGGERS: {
+    APP_LAUNCH: false,     // 开发环境禁用
+    PERIODIC: false,       // 开发环境禁用
+    MANUAL: true          // 保留手动同步
+  }
+}
+```
+
+**`services/api.js`** - API客户端
+- JWT Bearer token认证
+- 自动错误处理和重试
+- 开发环境mock响应
+- 30秒请求超时
+
+### 后端配置
+
+**`core/config.py`** - 应用配置
+```python
+# AI服务配置
+MOONSHOT_API_KEY / OPENAI_API_KEY
+# 微信小程序配置  
+WECHAT_APP_ID, WECHAT_APP_SECRET
+# 安全配置
+SECRET_KEY (JWT签名密钥)
+# 数据库配置
+DATABASE_URL, REDIS_URL
+```
+
+**`core/database.py`** - 数据库配置
+- SQLAlchemy ORM配置
+- SQLite主数据库连接
+- 外部词典数据库集成
+
+## 🚀 部署指南
+
+### 快速部署
 ```bash
 cd backend
-cp .env.example .env
-# 编辑 .env 文件，配置API密钥和数据库连接
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-3. **使用Docker Compose部署**
+### 生产部署
 ```bash
+# 使用Docker Compose
 docker-compose up -d
-```
 
-4. **验证部署**
-```bash
+# 检查服务状态
 curl http://localhost:8001/health
 ```
 
-### 前端部署
+### 微信小程序发布
+1. **域名配置** - 微信公众平台添加 `https://api.jimingge.net`
+2. **代码上传** - 微信开发者工具上传审核
+3. **版本发布** - 审核通过后正式发布
 
-1. **微信公众平台配置**
-   - 登录微信公众平台
-   - 配置服务器域名：`https://your-domain.com`
-   - 下载开发者工具
+## 🔍 数据库查询示例
 
-2. **导入项目**
+### 用户和词汇统计
 ```bash
-# 在微信开发者工具中导入 frontend/ 目录
+sqlite3 data/db/talkai.db "
+SELECT u.id, u.nickname, u.grade, 
+       COUNT(v.id) as total_vocab,
+       COUNT(CASE WHEN v.source='chat_correction' THEN 1 END) as corrections,
+       COUNT(CASE WHEN v.source='lookup' THEN 1 END) as lookups
+FROM users u 
+LEFT JOIN vocab_items v ON u.id = v.user_id 
+WHERE u.id = 'USER_ID_HERE'
+GROUP BY u.id;"
 ```
 
-3. **配置API地址**
-```javascript
-// frontend/services/api.js
-const BASE_URL = 'https://your-domain.com/api/v1';
-```
-
-4. **测试和上传**
-   - 在开发者工具中测试功能
-   - 上传代码并提交审核
-
-## 配置说明
-
-### 环境变量配置
-
-主要配置项在 `backend/.env` 文件中：
-
+### 查询特定词汇
 ```bash
-# AI服务配置（二选一）
-MOONSHOT_API_KEY=your_moonshot_api_key
-OPENAI_API_KEY=your_openai_api_key
-
-# 微信小程序配置
-WECHAT_APP_ID=your_wechat_app_id
-WECHAT_APP_SECRET=your_wechat_app_secret
-
-# 安全配置
-SECRET_KEY=your_32_character_secret_key
-
-# 数据库配置
-DATABASE_URL=sqlite:///./data/db/talkai.db
-REDIS_URL=redis://localhost:6380
-
-# 服务配置
-HOST=0.0.0.0
-PORT=8000
-DEBUG=false
+sqlite3 data/db/talkai.db "
+SELECT word, source, wrong_use_count, right_use_count, isMastered, added_date 
+FROM vocab_items 
+WHERE user_id = 'USER_ID_HERE' AND word = 'WORD_HERE';"
 ```
 
-### 微信小程序配置
-
-在微信公众平台配置以下信息：
-
-1. **服务器域名配置**
-   - request合法域名：`https://your-domain.com`
-   - socket合法域名：`wss://your-domain.com`（如需WebSocket）
-
-2. **业务域名配置**
-   - 业务域名：`https://your-domain.com`
-
-## 开发指南
-
-### 后端开发
-
+### 最近学习词汇
 ```bash
-# 安装依赖
-cd backend
-pip install -r requirements.txt
-
-# 运行开发服务器
-python main.py
-
-# 运行测试
-python -m pytest tests/ -v
-
-# 查看API文档
-# 访问 http://localhost:8000/docs
+sqlite3 data/db/talkai.db "
+SELECT word, source, added_date 
+FROM vocab_items 
+WHERE user_id = 'USER_ID_HERE' 
+AND source IN ('chat_correction', 'lookup') 
+ORDER BY added_date DESC 
+LIMIT 20;"
 ```
 
-### 前端开发
+## 🧩 核心功能实现
 
-```bash
-# 使用微信开发者工具打开 frontend/ 目录
-# 在工具中进行调试和预览
+### AI对话与纠错
+- **入口**：`chat.js:onSendMessage()`
+- **语法检查**：`ai.py:check_vocab_from_input()`
+- **错误分析**：提取`words_deserve_to_learn`数组
+- **词汇建议**：基于语义相似度推荐学习词汇
 
-# 主要开发文件
-frontend/pages/         # 页面逻辑
-frontend/services/api.js # API接口配置
-frontend/utils/         # 工具函数
-```
+### 词汇管理系统
+- **添加机制**：`vocabulary.py:add_vocabulary_item()`
+- **掌握度计算**：`right_use_count - wrong_use_count >= 3`
+- **来源分类**：chat_correction(改错) / lookup(查词) / level_vocab(等级)
+- **展示过滤**：词汇页面只显示用户主动学习的词汇
 
-### API接口文档
+### 用户认证与权限
+- **微信登录**：`auth.py:wechat_login()` 
+- **JWT管理**：24小时有效期，自动刷新
+- **开发环境**：固定用户ID避免重复创建
+- **权限控制**：基于用户ID的数据隔离
 
-主要API端点：
+## 🛠️ 开发注意事项
 
-- `POST /api/v1/auth/wechat/login` - 微信登录
-- `POST /api/v1/chat/send` - 发送聊天消息
-- `GET /api/v1/dict/query` - 词典查询
-- `POST /api/v1/vocab/add` - 添加词汇
-- `GET /api/v1/user/profile` - 用户信息
+### 开发环境特殊处理
+- **自动同步禁用** - 避免认证问题导致console刷屏
+- **固定用户ID** - 开发环境使用固定OpenID
+- **Mock响应** - API认证失败时自动降级到模拟数据
+- **环境检测** - 自动识别开发者工具vs真机环境
 
-完整API文档访问：`http://localhost:8001/docs`
+### 数据一致性保证
+- **字段名兼容** - 保持talkai_py原始命名(isMastered, wrong_use_count等)
+- **掌握度算法** - 完全复制原版逻辑
+- **词汇过滤** - 排除简单词汇和中文内容
+- **统计实时性** - 词汇操作后立即更新统计
 
-## 部署指南
+### 错误处理策略
+- **网络错误** - 自动降级到本地缓存
+- **认证失败** - 自动重新登录或使用mock数据  
+- **API超时** - 30秒超时+重试机制
+- **数据冲突** - 服务器数据优先原则
 
-### 生产环境部署
+## 📈 性能优化
 
-推荐使用自动化部署脚本：
+- **Redis缓存** - 热点数据缓存，减少数据库查询
+- **本地存储** - 关键数据离线可用
+- **分页加载** - 大量词汇数据分页展示
+- **异步处理** - 词汇统计和分析异步计算
 
-```bash
-# 交互式部署
-./deployment/deploy-existing-server.sh --interactive
+## 🔒 安全机制
 
-# 使用配置文件部署
-./deployment/deploy-existing-server.sh --config deployment/quick-deploy-config.sh
-
-# 检查部署状态
-./deployment/deploy-existing-server.sh --status
-```
-
-### 手动部署
-
-详细部署步骤参考：
-- [部署指南](DEPLOYMENT_GUIDE.md)
-- [快速开始](QUICK_START.md)
-- [故障排除](TROUBLESHOOTING.md)
-
-## 开发文档
-
-- [GitHub备份指南](GITHUB_BACKUP_GUIDE.md) - Git工作流和备份策略
-- [配置参考](CONFIG_REFERENCE.md) - 详细配置说明
-- [微信小程序设置](wechat_setup.md) - 微信平台配置
-- [Claude开发指南](CLAUDE.md) - AI辅助开发指导
-
-## 贡献指南
-
-欢迎提交Issue和Pull Request！
-
-### 开发流程
-
-1. Fork项目到个人仓库
-2. 创建功能分支：`git checkout -b feature/your-feature`
-3. 提交代码：`git commit -m "feat: 描述你的功能"`
-4. 推送分支：`git push origin feature/your-feature`
-5. 创建Pull Request
-
-### 代码规范
-
-- 后端遵循PEP8 Python代码规范
-- 前端遵循微信小程序开发规范
-- 提交信息遵循Conventional Commits规范
-- 添加适当的测试用例
-
-## 许可证
-
-本项目采用 [MIT License](LICENSE) 开源协议。
-
-## 支持与反馈
-
-- **Issue报告**: [GitHub Issues](https://github.com/username/talkai_miniprogram/issues)
-- **功能建议**: [GitHub Discussions](https://github.com/username/talkai_miniprogram/discussions)
-- **邮件联系**: your-email@example.com
-
-## 更新日志
-
-### v1.0.0 (2025-08-18)
-- ✨ 初始版本发布
-- 🤖 AI对话功能
-- 📚 词汇管理系统
-- 🔍 词典查询功能
-- 👤 微信登录集成
-- 🐳 Docker容器化部署
+- **JWT认证** - 所有API调用需要有效token
+- **用户隔离** - 基于user_id的严格数据隔离
+- **输入验证** - API参数校验和SQL注入防护
+- **CORS保护** - 限制跨域访问来源
 
 ---
 
-**TalkAI** - 让AI助力你的英语学习之旅 🚀
-
-
-------------------
-⏺ 前端本地缓存到后端数据库的词汇同步。
-  5分钟同步一次
-  代码位置：/Users/pean/aiproject/talkai_mini/frontend/config/sync.js:52
-
+**从talkai_py桌面版移植而来，保持原有功能完整性的同时适配微信小程序生态** 🚀

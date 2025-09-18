@@ -95,12 +95,18 @@
 
 .stats-grid {
   display: flex;
-  justify-content: space-around;
+  justify-content: space-between;
+  align-items: stretch;
 }
 
 .stat-item {
   text-align: center;
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 0 10rpx;
 }
 
 .stat-number {
@@ -109,11 +115,15 @@
   color: #2C5AA0;
   display: block;
   margin-bottom: 8rpx;
+  line-height: 1.2;
 }
 
 .stat-label {
   font-size: 22rpx;
   color: #666;
+  line-height: 1.3;
+  word-break: keep-all;
+  white-space: nowrap;
 }
 
 /* Vocabulary Section */

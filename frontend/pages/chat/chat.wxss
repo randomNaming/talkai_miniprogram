@@ -5,12 +5,19 @@
   display: flex;
   flex-direction: column;
   background: #F5F7FA;
+  position: relative;
 }
 
 /* Header */
 .chat-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
   background: linear-gradient(135deg, #2C5AA0 0%, #4A7BC8 100%);
   padding: 20rpx 30rpx;
+  padding-top: calc(20rpx + env(safe-area-inset-top));
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -120,6 +127,9 @@
 .messages-container {
   flex: 1;
   padding: 20rpx 0;
+  margin-top: calc(100rpx + env(safe-area-inset-top));
+  margin-bottom: 140rpx;
+  overflow-y: auto;
 }
 
 .messages-list {
@@ -493,6 +503,11 @@
 
 /* Input Area */
 .input-area {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
   background: white;
   border-top: 2rpx solid #E9ECEF;
   padding: 24rpx 30rpx;

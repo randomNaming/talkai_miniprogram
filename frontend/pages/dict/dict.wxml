@@ -79,7 +79,7 @@
   <!-- Initial State -->
   <view class="empty-container" wx:if="{{!isSearching && searchResults.length === 0 && searchText.length === 0 && recentSearches.length === 0}}">
     <text class="empty-icon">📖</text>
-    <text class="empty-title">英英词典</text>
+    <text class="empty-title">英汉词典</text>
     <text class="empty-desc">输入英文或中文开始查词</text>
   </view>
 </view>
