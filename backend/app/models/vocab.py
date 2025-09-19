@@ -50,8 +50,7 @@ class VocabItem(Base):
     embedding_vector = Column(Text, nullable=True)  # JSON string of vector
     related_words = Column(JSON, nullable=True)     # List of related words
     
-    # Timestamps 
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # Timestamps - using only last_used (removed updated_at redundancy)
     
     # Status (talkai_py compatible)
     is_active = Column(Boolean, default=True)
@@ -85,7 +84,6 @@ class VocabItem(Base):
             "familiarity": self.familiarity,
             "mastery_score": self.mastery_score,
             "related_words": self.related_words or [],
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "is_active": self.is_active,
             # Computed fields for backward compatibility
             "encounter_count": self.encounter_count,

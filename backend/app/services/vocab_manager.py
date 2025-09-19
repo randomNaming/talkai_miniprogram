@@ -145,7 +145,7 @@ class VocabManager:
                 if existing_vocab:
                     # 更新现有词汇
                     existing_vocab.last_reviewed = datetime.utcnow()
-                    existing_vocab.updated_at = datetime.utcnow()
+                    existing_vocab.last_used = datetime.utcnow()
                     
                     if source in ["user_input", "lookup", "wrong_use"]:  # 3 cases for wrong_use_count
                         # wrong_use_count = encounter_count - correct_count
@@ -207,7 +207,6 @@ class VocabManager:
                 mastery_score=correct_count - (encounter_count - correct_count),  # right_use_count - wrong_use_count
                 is_mastered=False,
                 created_at=today,
-                updated_at=today,
                 last_reviewed=today,
                 is_active=True
             )

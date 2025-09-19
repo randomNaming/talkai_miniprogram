@@ -50,7 +50,7 @@ class VocabItem(Base):
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # Removed updated_at - using only last_used for consistency
     
     # Status
     is_active = Column(Boolean, default=True)
@@ -140,7 +140,6 @@ def import_learning_vocab_json(user_id: str = "3ed4291004c12c2a", json_file_path
                     
                     # Timestamps
                     created_at=added_date,
-                    updated_at=datetime.utcnow(),
                     last_reviewed=last_reviewed,
                     
                     # Status

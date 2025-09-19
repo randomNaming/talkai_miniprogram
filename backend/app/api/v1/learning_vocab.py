@@ -80,7 +80,7 @@ async def get_learning_vocabulary(
                 query = query.filter(VocabItem.source == source)
         
         # Order by last update
-        query = query.order_by(VocabItem.updated_at.desc())
+        query = query.order_by(VocabItem.last_used.desc())
         
         if limit:
             query = query.limit(limit)
@@ -246,7 +246,7 @@ async def get_unmastered_vocabulary(
             VocabItem.user_id == user_id,
             VocabItem.is_active == True,
             VocabItem.isMastered == False
-        ).order_by(VocabItem.updated_at.desc()).limit(limit).all()
+        ).order_by(VocabItem.last_used.desc()).limit(limit).all()
         
         # Convert to learning vocab format
         unmastered_vocab = []

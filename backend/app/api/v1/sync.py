@@ -30,7 +30,6 @@ class VocabSyncItem(BaseModel):
     mastery_score: float = 0.0
     is_mastered: bool = False
     last_reviewed: str = None
-    updated_at: str
 
 
 class VocabSyncRequest(BaseModel):
@@ -85,11 +84,12 @@ async def sync_vocabulary(
                     VocabItem.is_active == True
                 ).first()
                 
-                client_updated_at = datetime.fromisoformat(client_item.updated_at.replace('Z', '+00:00'))
+                # Use last_reviewed as update timestamp or current time
+                client_updated_at = datetime.fromisoformat(client_item.last_reviewed.replace('Z', '+00:00')) if client_item.last_reviewed else datetime.utcnow()
                 
                 if existing:
                     # Check for conflict (server was updated after client's last sync)
-                    if last_sync_dt and existing.updated_at > last_sync_dt:
+                    if last_sync_dt and existing.last_used and existing.last_used > last_sync_dt:
                         # Conflict detected - server wins
                         conflicts_resolved += 1
                         logger.info(f"Conflict resolved for word '{client_item.word}' - server version kept")
@@ -110,7 +110,7 @@ async def sync_vocabulary(
                     if client_item.last_reviewed:
                         existing.last_reviewed = datetime.fromisoformat(client_item.last_reviewed.replace('Z', '+00:00'))
                     
-                    existing.updated_at = client_updated_at
+                    existing.last_used = client_updated_at
                     
                 else:
                     # Create new vocabulary item
@@ -129,7 +129,7 @@ async def sync_vocabulary(
                         is_mastered=client_item.is_mastered,
                         last_reviewed=datetime.fromisoformat(client_item.last_reviewed.replace('Z', '+00:00')) if client_item.last_reviewed else None,
                         created_at=client_updated_at,
-                        updated_at=client_updated_at,
+                        last_used=client_updated_at,
                         is_active=True
                     )
                     db.add(new_item)
@@ -145,9 +145,9 @@ async def sync_vocabulary(
         )
         
         if last_sync_dt:
-            query = query.filter(VocabItem.updated_at > last_sync_dt)
+            query = query.filter(VocabItem.last_used > last_sync_dt)
         
-        server_items = query.order_by(VocabItem.updated_at.desc()).all()
+        server_items = query.order_by(VocabItem.last_used.desc()).all()
         
         # Format server vocabulary for response
         vocabulary_response = []
@@ -165,7 +165,7 @@ async def sync_vocabulary(
                 mastery_score=item.mastery_score,
                 is_mastered=item.is_mastered,
                 last_reviewed=item.last_reviewed.isoformat() if item.last_reviewed else None,
-                updated_at=item.updated_at.isoformat()
+                updated_at=item.last_used.isoformat() if item.last_used else ""
             ))
         
         # Update user's last sync time
@@ -218,10 +218,10 @@ async def get_sync_status(
         ).count()
         
         # Get last vocabulary update time
-        last_vocab_update = db.query(VocabItem.updated_at).filter(
+        last_vocab_update = db.query(VocabItem.last_used).filter(
             VocabItem.user_id == user_id,
             VocabItem.is_active == True
-        ).order_by(VocabItem.updated_at.desc()).first()
+        ).order_by(VocabItem.last_used.desc()).first()
         
         return {
             "user_id": user_id,
@@ -278,7 +278,7 @@ async def force_download_all_data(
                 mastery_score=item.mastery_score,
                 is_mastered=item.is_mastered,
                 last_reviewed=item.last_reviewed.isoformat() if item.last_reviewed else None,
-                updated_at=item.updated_at.isoformat()
+                updated_at=item.last_used.isoformat() if item.last_used else ""
             ))
         
         return {

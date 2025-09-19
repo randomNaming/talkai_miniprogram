@@ -34,7 +34,6 @@ class VocabItemResponse(BaseModel):
     mastery_score: float = 0.0
     related_words: List[str] = []
     created_at: Optional[str] = None
-    updated_at: Optional[str] = None
     is_active: bool = True
     is_mastered: bool = False
 
@@ -113,7 +112,7 @@ async def get_vocabulary_list(
         # Apply pagination and ordering
         vocab_items = (
             query
-            .order_by(VocabItem.updated_at.desc())
+            .order_by(VocabItem.last_used.desc())
             .offset(offset)
             .limit(limit)
             .all()
@@ -137,7 +136,7 @@ async def get_vocabulary_list(
                 mastery_score=item.mastery_score,
                 related_words=item.related_words or [],
                 created_at=item.created_at.isoformat() if item.created_at else None,
-                updated_at=item.updated_at.isoformat() if item.updated_at else None,
+                
                 is_active=item.is_active,
                 is_mastered=item.is_mastered
             ))
@@ -210,7 +209,7 @@ async def create_vocabulary_item(
             correct_count=0,
             mastery_score=0.0,
             created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            
             is_active=True,
             is_mastered=False
         )
@@ -234,7 +233,6 @@ async def create_vocabulary_item(
             mastery_score=vocab_item.mastery_score,
             related_words=vocab_item.related_words or [],
             created_at=vocab_item.created_at.isoformat() if vocab_item.created_at else None,
-            updated_at=vocab_item.updated_at.isoformat() if vocab_item.updated_at else None,
             is_active=vocab_item.is_active,
             is_mastered=vocab_item.is_mastered
         )
@@ -293,7 +291,7 @@ async def update_vocabulary_item(
         if vocab_update.is_mastered is not None:
             vocab_item.is_mastered = vocab_update.is_mastered
         
-        vocab_item.updated_at = datetime.utcnow()
+        vocab_item.last_used = datetime.utcnow()
         
         db.commit()
         db.refresh(vocab_item)
@@ -313,7 +311,6 @@ async def update_vocabulary_item(
             mastery_score=vocab_item.mastery_score,
             related_words=vocab_item.related_words or [],
             created_at=vocab_item.created_at.isoformat() if vocab_item.created_at else None,
-            updated_at=vocab_item.updated_at.isoformat() if vocab_item.updated_at else None,
             is_active=vocab_item.is_active,
             is_mastered=vocab_item.is_mastered
         )
@@ -355,7 +352,7 @@ async def delete_vocabulary_item(
         
         # Soft delete
         vocab_item.is_active = False
-        vocab_item.updated_at = datetime.utcnow()
+        vocab_item.last_used = datetime.utcnow()
         
         db.commit()
         
@@ -441,7 +438,7 @@ async def bulk_create_vocabulary(
                 correct_count=0,
                 mastery_score=0.0,
                 created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                
                 is_active=True,
                 is_mastered=False
             )
@@ -470,7 +467,7 @@ async def bulk_create_vocabulary(
                 mastery_score=item.mastery_score,
                 related_words=item.related_words or [],
                 created_at=item.created_at.isoformat() if item.created_at else None,
-                updated_at=item.updated_at.isoformat() if item.updated_at else None,
+                
                 is_active=item.is_active,
                 is_mastered=item.is_mastered
             ))
@@ -658,7 +655,7 @@ async def load_vocabulary_by_level(
                 # Update existing word with level information
                 existing.level = level
                 existing.source = "level_vocab"
-                existing.updated_at = datetime.utcnow()
+                existing.last_used = datetime.utcnow()
                 updated_count += 1
             else:
                 # Auto-lookup word details
@@ -686,7 +683,7 @@ async def load_vocabulary_by_level(
                     correct_count=0,
                     mastery_score=0.0,
                     created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow(),
+                    
                     is_active=True,
                     is_mastered=False
                 )
@@ -782,7 +779,7 @@ async def update_word_usage(
                 correct_count=1 if usage_type == "right_use" else 0,
                 mastery_score=0.0,
                 created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                
                 is_active=True,
                 is_mastered=False
             )
@@ -795,7 +792,7 @@ async def update_word_usage(
             if usage_type == "right_use":
                 vocab_item.correct_count = (vocab_item.correct_count or 0) + 1
             
-            vocab_item.updated_at = datetime.utcnow()
+            vocab_item.last_used = datetime.utcnow()
         
         # Calculate wrong_use_count (encounter_count - correct_count)
         right_use_count = vocab_item.correct_count or 0

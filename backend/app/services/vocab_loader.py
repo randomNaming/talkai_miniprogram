@@ -97,8 +97,7 @@ class VocabLoader:
             isMastered=False,   # 使用talkai_py兼容字段名
             is_active=True,
             added_date=today,   # 使用talkai_py兼容字段名
-            last_used=None,     # 使用talkai_py兼容字段名
-            updated_at=today
+            last_used=None      # 使用talkai_py兼容字段名，已移除updated_at冗余字段
         )
     
     def _create_word_entry_from_json(self, vocab_data: Dict, user_id: str) -> VocabItem:
@@ -130,8 +129,7 @@ class VocabLoader:
             isMastered=vocab_data.get("isMastered", False),
             is_active=True,
             added_date=added_date,
-            last_used=last_used,
-            updated_at=today
+            last_used=last_used
         )
     
     def _update_existing_word(self, vocab_item: VocabItem, grade: str) -> None:
@@ -144,7 +142,7 @@ class VocabLoader:
         else:
             vocab_item.level = grade.lower().replace(" ", "_")
             
-        vocab_item.updated_at = datetime.utcnow()
+        vocab_item.last_used = datetime.utcnow()
     
     def load_vocab_by_grade(self, user_id: str, db: Session) -> bool:
         """根据用户grade从JSON/txt文件加载对应词汇表（优先使用JSON格式保持talkai_py兼容性）"""

@@ -555,8 +555,7 @@ async def get_user_vocab_list(
                 "right_use_count": item.right_use_count or 0,
                 "isMastered": item.isMastered or False,  # talkai_py兼容字段名
                 "added_date": item.added_date.isoformat() if item.added_date else "",
-                "last_used": item.last_used.isoformat() if item.last_used else "",
-                "updated_at": item.updated_at.isoformat() if item.updated_at else ""
+                "last_used": item.last_used.isoformat() if item.last_used else ""
             }
             vocab_list.append(vocab_dict)
         
@@ -606,8 +605,7 @@ async def get_vocab_list_simple(
                 "right_use_count": item.right_use_count or 0,
                 "isMastered": item.isMastered or False,  # talkai_py兼容字段名
                 "added_date": item.added_date.isoformat() if item.added_date else "",
-                "last_used": item.last_used.isoformat() if item.last_used else "",
-                "updated_at": item.updated_at.isoformat() if item.updated_at else ""
+                "last_used": item.last_used.isoformat() if item.last_used else ""
             }
             vocab_list.append(vocab_dict)
         
