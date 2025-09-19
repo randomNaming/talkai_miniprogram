@@ -582,7 +582,10 @@ async function addVocabWordToBackend(word, source = "chat_correction") {
   try {
     console.log(`Adding vocabulary word to backend: ${word} (source: ${source})`);
     const result = await learningVocab.addWord(word, "none", source);
-    console.log('Backend add word result:', result);
+    console.log('Backend add word result raw:', JSON.stringify(result, null, 2));
+    console.log('Backend add word result type:', typeof result);
+    console.log('Backend add word result success field:', result?.success);
+    console.log('Backend add word result success type:', typeof result?.success);
     return result;
   } catch (error) {
     console.error('Failed to add vocabulary word to backend:', error);

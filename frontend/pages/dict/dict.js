@@ -193,10 +193,18 @@ Page({
           return;
         }
         
-        // 2. 将词汇添加到学习词汇库（使用认证API）
-        const addResult = await api.addVocabWordToBackend(word, 'lookup');
+        // 2. 将词汇添加到学习词汇库（直接调用API）
+        const addResult = await api.learningVocab.addWord(word, 'none', 'lookup');
         
-        // 3. 返回组合结果
+        // 3. 处理成功结果
+        let vocabMessage = '';
+        if (addResult.action === 'updated') {
+          vocabMessage = `已更新词汇 '${word}'`;
+        } else {
+          vocabMessage = `已将 '${word}' 添加到词汇库`;
+        }
+        
+        // 4. 返回组合结果
         resolve({
           word: dictResult.word,
           definition: dictResult.definition,
@@ -204,7 +212,9 @@ Page({
           translation: dictResult.translation,
           pos: dictResult.pos,
           added_to_vocab: true,
-          message: `已将 '${word}' 添加到词汇库`
+          vocab_action: addResult.action || 'added',
+          is_level_vocab: addResult.is_level_vocab || false,
+          message: vocabMessage
         });
         
       } catch (error) {

@@ -63,42 +63,62 @@ Page({
     console.log('[VocabPage] 已禁用数据加载，使用静态数据');
   },
 
-  // 加载最近添加的词汇（AI改错和词典查词）
+  // 加载最近添加的词汇（AI改错、词典查词和最近更新的等级词汇）
   loadRecentVocabulary: function() {
-    console.log('[VocabPage] 加载最近词汇（AI改错和词典查词）');
+    console.log('[VocabPage] 加载最近词汇（包括更新的等级词汇）');
     
-    // 生产环境使用真实API
+    // 简化版本：直接加载最近更新的所有词汇
     api.learningVocab.getList({
-      source: 'chat_correction,lookup',
-      limit: 10
+      include_recent_level: true,
+      limit: 50  // 增加limit来显示更多词汇
     }).then(recentVocab => {
-      console.log('[VocabPage] 成功获取词汇数据:', recentVocab.length);
+      console.log('[VocabPage] 成功获取词汇数据:', recentVocab.length, recentVocab);
       
-      const filteredVocab = recentVocab.filter(item => {
-        return item.source === 'chat_correction' || item.source === 'lookup';
-      }).map(item => {
+      const processedVocab = recentVocab.map(item => {
+        // 检查是否是被突出显示的等级词汇
+        const highlightedWord = app.globalData.highlightedLevelWord;
+        const isHighlighted = highlightedWord && 
+                             highlightedWord.word === item.word &&
+                             (Date.now() - highlightedWord.timestamp) < 30000; // 30秒内高亮
+        
         return {
           word: item.word,
           source: item.source,
+          level: item.level,
           added_date: item.added_date,
           isMastered: item.is_mastered,
           right_use_count: item.right_use_count,
           wrong_use_count: item.wrong_use_count,
-          last_used: item.last_used
+          last_used: item.last_used,
+          isHighlighted: isHighlighted,
+          isRecentLevelVocab: item.source === 'level_vocab'
         };
       });
       
+      // 如果有高亮词汇，将其排在最前面
+      const highlightedItems = processedVocab.filter(item => item.isHighlighted);
+      const normalItems = processedVocab.filter(item => !item.isHighlighted);
+      const sortedVocab = [...highlightedItems, ...normalItems];
+      
       // 也更新基本统计数据
       const totalWords = recentVocab.length;
-      const masteredWords = filteredVocab.filter(item => item.isMastered).length;
+      const masteredWords = processedVocab.filter(item => item.isMastered).length;
       
       this.setData({
-        vocabList: filteredVocab,
+        vocabList: sortedVocab,
         totalWords: totalWords,
         masteredWords: masteredWords,
         learningWords: totalWords - masteredWords,
         progressPercentage: totalWords > 0 ? Math.round((masteredWords / totalWords) * 100) : 0
       });
+      
+      // 清除高亮标记（30秒后自动清除）
+      if (app.globalData.highlightedLevelWord) {
+        setTimeout(() => {
+          app.globalData.highlightedLevelWord = null;
+          this.loadRecentVocabulary(); // 重新加载去除高亮
+        }, 30000);
+      }
       
     }).catch(error => {
       console.error('[VocabPage] 加载最近词汇失败:', error);

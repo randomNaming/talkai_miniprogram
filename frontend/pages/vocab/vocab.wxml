@@ -39,15 +39,20 @@
     </view>
 
     <view 
-      class="vocab-item" 
+      class="vocab-item {{item.isHighlighted ? 'highlighted-level-vocab' : ''}} {{item.isRecentLevelVocab ? 'recent-level-vocab' : ''}}" 
       wx:for="{{vocabList}}" 
       wx:key="id"
       bindtap="onVocabTap"
       data-vocab="{{item}}"
     >
+      <!-- 高亮标记 -->
+      <view wx:if="{{item.isHighlighted}}" class="highlight-badge">新更新</view>
+      
       <view class="vocab-main">
         <view class="vocab-word">{{item.word}}</view>
         <view class="vocab-phonetic" wx:if="{{item.phonetic}}">{{item.phonetic}}</view>
+        <!-- 显示等级信息 -->
+        <view wx:if="{{item.isRecentLevelVocab && item.level}}" class="vocab-level">{{item.level}}等级词汇</view>
       </view>
       <view class="vocab-meaning">{{item.translation || item.definition}}</view>
       <view class="vocab-meta">

@@ -704,13 +704,41 @@ Page({
     // 调用后端API添加词汇
     api.addVocabWordToBackend(vocab.corrected, 'chat_correction')
       .then(result => {
-        console.log('词汇添加成功:', result);
+        console.log('词汇添加结果:', result);
+        
+        // 检查API返回是否成功 - 修复判断逻辑
+        if (!result) {
+          throw new Error('No response from vocabulary API');
+        }
+        
+        if (result.success === false) {
+          throw new Error(result.message || 'Failed to add word to vocabulary');
+        }
+        
+        // 根据操作类型显示不同的提示
+        let toastTitle = '已添加到词汇表';
+        if (result.action === 'updated' && result.is_level_vocab) {
+          toastTitle = '等级词汇已更新';
+          
+          // 标记需要在词汇页面突出显示这个等级词汇
+          app.globalData.highlightedLevelWord = {
+            word: result.word,
+            timestamp: Date.now(),
+            source: result.original_source,
+            level: result.original_level
+          };
+        } else if (result.action === 'updated') {
+          toastTitle = '词汇已更新';
+        }
         
         wx.showToast({
-          title: '已添加到词汇表',
+          title: toastTitle,
           icon: 'success',
           duration: 1500
         });
+        
+        // 设置需要刷新词汇页面的标记
+        app.globalData.needRefreshVocab = true;
         
         // 触发词汇数据同步刷新
         if (app.globalData.vocabSyncManager) {

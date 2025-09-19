@@ -45,6 +45,7 @@ async def get_learning_vocabulary(
     is_mastered: Optional[bool] = Query(None, description="Filter by mastery status"),
     level: Optional[str] = Query(None, description="Filter by level"),
     source: Optional[str] = Query(None, description="Filter by source"),
+    include_recent_level: Optional[bool] = Query(False, description="Include recently updated level vocabulary"),
     limit: Optional[int] = Query(None, description="Limit number of results"),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -71,13 +72,38 @@ async def get_learning_vocabulary(
         if level:
             query = query.filter(VocabItem.level == level)
             
-        if source:
-            # Support multiple sources separated by comma
-            if ',' in source:
-                source_list = [s.strip() for s in source.split(',')]
-                query = query.filter(VocabItem.source.in_(source_list))
-            else:
-                query = query.filter(VocabItem.source == source)
+        # Handle source filtering and recent level vocabulary
+        if source or include_recent_level:
+            from sqlalchemy import or_
+            conditions = []
+            
+            # Add regular source conditions
+            if source:
+                if ',' in source:
+                    source_list = [s.strip() for s in source.split(',')]
+                else:
+                    source_list = [source]
+                conditions.append(VocabItem.source.in_(source_list))
+            
+            # Add recent level vocabulary condition
+            if include_recent_level:
+                from datetime import datetime, timedelta
+                recent_cutoff = datetime.utcnow() - timedelta(hours=168)  # 7 days for debugging
+                
+                # Add condition for recently updated level vocab
+                level_vocab_condition = (
+                    (VocabItem.source == 'level_vocab') & 
+                    (VocabItem.last_used >= recent_cutoff)
+                )
+                conditions.append(level_vocab_condition)
+                
+                # Also add a separate condition to get recently updated ANY vocab for debugging
+                recent_any_condition = VocabItem.last_used >= recent_cutoff
+                conditions.append(recent_any_condition)
+            
+            # Combine conditions with OR
+            if conditions:
+                query = query.filter(or_(*conditions))
         
         # Order by last update
         query = query.order_by(VocabItem.last_used.desc())
@@ -296,7 +322,7 @@ async def add_learning_vocabulary_word(
             )
         
         # Add word using vocabulary service
-        success = await vocabulary_service.add_vocabulary_item(
+        result = await vocabulary_service.add_vocabulary_item(
             user_id=user_id,
             word=word,
             level=level,
@@ -304,10 +330,23 @@ async def add_learning_vocabulary_word(
             db=db
         )
         
-        if success:
-            return {"message": f"Added '{word}' to learning vocabulary", "word": word}
+        if result["success"]:
+            return {
+                "success": True,
+                "message": result["message"], 
+                "word": result["word"],
+                "action": result["action"],
+                "is_level_vocab": result.get("is_level_vocab", False),
+                "original_source": result.get("original_source"),
+                "original_level": result.get("original_level")
+            }
         else:
-            return {"message": f"Word '{word}' already exists in learning vocabulary", "word": word}
+            return {
+                "message": result["message"], 
+                "word": word,
+                "success": False,
+                "reason": result.get("reason")
+            }
             
     except HTTPException:
         raise
@@ -316,6 +355,58 @@ async def add_learning_vocabulary_word(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to add word to learning vocabulary"
+        )
+
+
+@router.get("/debug", response_model=Dict[str, Any])
+async def debug_vocabulary(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Debug endpoint to check vocabulary status"""
+    try:
+        user_id = current_user["sub"]
+        
+        # Get all vocab with last_used info
+        all_vocab = db.query(VocabItem).filter(
+            VocabItem.user_id == user_id,
+            VocabItem.is_active == True
+        ).order_by(VocabItem.last_used.desc()).limit(20).all()
+        
+        vocab_debug = []
+        for item in all_vocab:
+            vocab_debug.append({
+                "word": item.word,
+                "source": item.source,
+                "level": item.level,
+                "last_used": item.last_used.isoformat() if item.last_used else None,
+                "wrong_use_count": item.wrong_use_count,
+                "right_use_count": item.right_use_count
+            })
+        
+        from datetime import datetime, timedelta
+        recent_cutoff = datetime.utcnow() - timedelta(hours=24)
+        
+        recent_level_vocab = db.query(VocabItem).filter(
+            VocabItem.user_id == user_id,
+            VocabItem.is_active == True,
+            VocabItem.source == 'level_vocab',
+            VocabItem.last_used >= recent_cutoff
+        ).all()
+        
+        return {
+            "total_vocab_count": len(all_vocab),
+            "recent_level_vocab_count": len(recent_level_vocab),
+            "recent_cutoff": recent_cutoff.isoformat(),
+            "all_vocab": vocab_debug,
+            "recent_level_words": [item.word for item in recent_level_vocab]
+        }
+        
+    except Exception as e:
+        logger.error(f"Debug vocabulary failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Debug failed: {str(e)}"
         )
 
 

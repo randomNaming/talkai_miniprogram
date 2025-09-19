@@ -111,6 +111,66 @@
   padding: 30rpx;
   margin-bottom: 20rpx;
   box-shadow: 0 2rpx 8rpx rgba(0,0,0,0.1);
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+/* 高亮显示的等级词汇 */
+.vocab-item.highlighted-level-vocab {
+  background: linear-gradient(135deg, #FFF8E1 0%, #FFECB3 100%);
+  border: 2rpx solid #FF9800;
+  box-shadow: 0 4rpx 16rpx rgba(255, 152, 0, 0.3);
+  animation: highlightPulse 2s ease-in-out infinite;
+}
+
+/* 普通的最近等级词汇 */
+.vocab-item.recent-level-vocab {
+  border-left: 6rpx solid #4CAF50;
+}
+
+@keyframes highlightPulse {
+  0%, 100% { 
+    transform: scale(1); 
+    box-shadow: 0 4rpx 16rpx rgba(255, 152, 0, 0.3);
+  }
+  50% { 
+    transform: scale(1.02); 
+    box-shadow: 0 6rpx 20rpx rgba(255, 152, 0, 0.4);
+  }
+}
+
+/* 高亮标记 */
+.highlight-badge {
+  position: absolute;
+  top: -8rpx;
+  right: -8rpx;
+  background: linear-gradient(135deg, #FF5722 0%, #FF9800 100%);
+  color: white;
+  font-size: 20rpx;
+  font-weight: 600;
+  padding: 8rpx 16rpx;
+  border-radius: 20rpx;
+  box-shadow: 0 2rpx 8rpx rgba(255, 87, 34, 0.4);
+  z-index: 10;
+  animation: badgeBounce 0.5s ease-out;
+}
+
+@keyframes badgeBounce {
+  0% { transform: scale(0) rotate(45deg); opacity: 0; }
+  50% { transform: scale(1.2) rotate(0deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+/* 等级信息 */
+.vocab-level {
+  font-size: 22rpx;
+  color: #4CAF50;
+  background: #E8F5E8;
+  padding: 4rpx 8rpx;
+  border-radius: 8rpx;
+  display: inline-block;
+  margin-top: 6rpx;
+  font-weight: 500;
 }
 
 .vocab-word {
