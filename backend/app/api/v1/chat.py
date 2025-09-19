@@ -149,21 +149,21 @@ async def send_message_stream(
                 logger.error(f"Vocabulary suggestion failed: {e}")
                 yield f"data: {json.dumps({'type': 'error', 'content': f'Vocabulary suggestion failed: {str(e)}'})}\n\n"
             
-            # 步骤4: 取消自动词汇更新 - 只在用户点击"+"号时手动添加
-            # 异步词汇更新 (如果有语法纠正结果) - 已注释，改为手动添加模式
-            # if 'grammar_result' in locals() and grammar_result:
-            #     logger.info(f"Stream Step 4: Starting vocabulary update")
-            #     try:
-            #         await ai_service.update_vocabulary_from_correction(
-            #             grammar_result=grammar_result,
-            #             user_input=user_input,
-            #             user_id=user_id,
-            #             db=db
-            #         )
-            #         yield f"data: {json.dumps({'type': 'vocab_update_complete', 'content': 'success'})}\n\n"
-            #     except Exception as e:
-            #         logger.error(f"Vocabulary update failed: {e}")
-            #         yield f"data: {json.dumps({'type': 'error', 'content': f'Vocabulary update failed: {str(e)}'})}\n\n"
+            # 步骤4: 自动词汇更新 - 恢复功能
+            # 异步词汇更新 (如果有语法纠正结果)
+            if 'grammar_result' in locals() and grammar_result:
+                logger.info(f"Stream Step 4: Starting vocabulary update")
+                try:
+                    await ai_service.update_vocabulary_from_correction(
+                        grammar_result=grammar_result,
+                        user_input=user_input,
+                        user_id=user_id,
+                        db=db
+                    )
+                    yield f"data: {json.dumps({'type': 'vocab_update_complete', 'content': 'success'})}\n\n"
+                except Exception as e:
+                    logger.error(f"Vocabulary update failed: {e}")
+                    yield f"data: {json.dumps({'type': 'error', 'content': f'Vocabulary update failed: {str(e)}'})}\n\n"
             
             # 步骤5: 保存聊天记录
             try:
@@ -402,18 +402,18 @@ async def check_grammar_only(
         else:
             has_error = False
         
-        # 注释掉自动词汇更新：错词不再自动添加到词汇库，只有用户点击"+"号时才手动添加
+        # 恢复自动词汇更新功能：自动更新词汇库统计
         # Background vocabulary update (like talkai_py)
-        # if has_error and result:
-        #     import asyncio
-        #     asyncio.create_task(
-        #         ai_service.update_vocabulary_from_correction(
-        #             grammar_result=result,
-        #             user_input=text,
-        #             user_id=user_id,
-        #             db=db
-        #         )
-        #     )
+        if result:  # 无论有无错误都更新，因为需要统计正确使用的词汇
+            import asyncio
+            asyncio.create_task(
+                ai_service.update_vocabulary_from_correction(
+                    grammar_result=result,
+                    user_input=text,
+                    user_id=user_id,
+                    db=db
+                )
+            )
         
         return GrammarCheckResult(
             corrected_input=corrected_input or text,

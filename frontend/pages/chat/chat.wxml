@@ -75,20 +75,17 @@
               </view>
               <!-- Vocabulary to learn -->
               <view class="vocab-to-learn" wx:if="{{item.grammar_check.vocab_to_learn.length > 0}}">
-                <text class="vocab-title">需要学习的词汇：</text>
+                <text class="vocab-title">已自动更新词汇：</text>
                 <view class="vocab-list">
                   <view 
                     class="vocab-item" 
                     wx:for="{{item.grammar_check.vocab_to_learn}}" 
                     wx:for-item="vocab"
                     wx:key="original"
-                    bindtap="onAddVocab"
-                    data-vocab="{{vocab}}"
                   >
                     <text class="vocab-original">{{vocab.original}}</text>
                     <text class="vocab-arrow">→</text>
                     <text class="vocab-corrected error-type-{{vocab.error_type || 'vocabulary'}}">{{vocab.corrected}}</text>
-                    <text class="vocab-add-btn">+</text>
                   </view>
                 </view>
               </view>

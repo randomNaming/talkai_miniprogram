@@ -411,6 +411,8 @@ class VocabularyService:
             # 处理正确使用的单词(right_use)
             correct_used_words = set()
             
+            logger.info(f"开始处理正确使用的单词 - corrected_input: {corrected_input}, words_deserve_to_learn: {len(words_deserve_to_learn)}, user_input: {user_input}")
+            
             if corrected_input:
                 # 有修正输入，对比原始输入和修正后的输入，找出正确使用的单词
                 original_words = set(re.findall(r'\b\w+\b', user_input.lower()))
@@ -419,23 +421,32 @@ class VocabularyService:
                 # 找出两者共有的单词（可能是正确使用的单词）
                 common_words = original_words.intersection(corrected_words)
                 correct_used_words = common_words - simple_words
+                logger.info(f"有修正输入场景 - original_words: {original_words}, corrected_words: {corrected_words}, correct_used_words: {correct_used_words}")
             else:
                 # 输入完全正确（corrected_input为null），直接提取输入中的所有单词
                 # 如果 没有值得学习的单词，且输入全英文，correct_used_words 为全部单词-simple_words
                 if not words_deserve_to_learn and not has_chinese(user_input):
                     all_words = set(re.findall(r'\b\w+\b', user_input.lower())) 
                     correct_used_words = all_words - simple_words
+                    logger.info(f"输入完全正确场景 - all_words: {all_words}, simple_words数量: {len(simple_words)}, correct_used_words: {correct_used_words}")
                 # 如果输入有中文，或有值得学习的单词，则correct_used_words 为空 （保守策略）
                 else:
                     correct_used_words = set()
+                    logger.info(f"保守策略场景 - 有中文或有错误单词，correct_used_words为空")
             
             # 更新词汇使用情况
             if correct_used_words:
+                logger.info(f"准备更新 {len(correct_used_words)} 个正确使用的单词: {correct_used_words}")
                 for word in correct_used_words:
                     if len(word) > 2:  # 忽略过短的单词
+                        logger.info(f"正在更新词汇 '{word}' 的 right_use_count")
                         await self._update_learning_vocab_async(
                             user_id, word, "right_use", db
                         )
+                    else:
+                        logger.info(f"跳过过短单词: '{word}'")
+            else:
+                logger.info("没有需要更新 right_use_count 的单词")
             
             return True
             
@@ -551,6 +562,11 @@ class VocabularyService:
                     
                     logger.info(
                         f"创建新词汇 {word} for user {user_id}, source: {source}"
+                    )
+                else:
+                    # right_use 但词汇不存在，按照设计不创建新词汇
+                    logger.info(
+                        f"单词 '{word}' 正确使用但不在用户词汇库中，跳过 (用户 {user_id})"
                     )
             
             return True

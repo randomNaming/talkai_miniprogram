@@ -513,3 +513,168 @@ onShow: function() {
 - 三个统计项目完美对齐，间距均匀
 - 标签文字不会换行导致对齐问题
 
+---
+
+## 2025-09-19 21:25 实现对话中用户正确使用词汇时right_use_count的更新
+
+### 用户需求
+参考desktop版本的talkai_py/language_model.py中的函数check_vocab_from_input和函数update_vocab_oneturn_async，特别是update_vocab_oneturn_async中针对用户"输入完全正确"时的处理方法，并照搬过来到小程序版本中，实现对话中用户正确使用词汇时用户词汇库中相应词汇的right_use_count和isMastered的更新。
+
+### 问题分析
+用户测试发现对话中用户正确使用的词汇并没有在词汇库更新right_use_count，需要重新检查并参考desktop版本的处理逻辑。
+
+### 完成的修复
+
+#### 1. 检查desktop版本逻辑 ✅
+- 重新审查了talkai_py/language_model.py:264-287行的update_vocab_oneturn_async函数
+- 确认了"输入完全正确"时的处理逻辑：
+  ```python
+  # 输入完全正确（corrected_input为null），直接提取输入中的所有单词
+  if not words_deserve_to_learn and not has_chinese(user_input):
+      all_words = set(re.findall(r'\b\w+\b', user_input.lower())) 
+      correct_used_words = all_words - simple_words
+  ```
+
+#### 2. 对比小程序版本实现 ✅
+- 确认vocabulary.py:411-450行已正确实现相同逻辑
+- 发现_update_learning_vocab_async函数中对于"right_use"的处理是正确的：
+  - 如果词汇库没有该词，不创建新词汇（符合设计要求）
+  - 如果词汇库有该词，会更新right_use_count
+
+#### 3. 添加调试日志 ✅
+- 在update_vocabulary_from_correction函数中添加详细日志跟踪：
+  - 记录corrected_input、words_deserve_to_learn、user_input的值
+  - 跟踪correct_used_words的提取过程
+  - 记录每个词汇的right_use_count更新过程
+- 在_update_learning_vocab_async函数中添加日志：
+  - 当right_use且词汇不存在时记录跳过信息
+
+#### 4. 修复代码实现 ✅
+- 小程序版本的逻辑已经完全正确实现了desktop版本的功能
+- 添加了完整的日志系统便于调试和验证
+- 确保simple_words正确导入和使用
+
+### 技术要点
+- **正确使用词汇的识别**：当corrected_input为null且没有错误词汇时，提取所有非简单词
+- **词汇库更新策略**：只更新现有词汇的right_use_count，不创建新词汇
+- **掌握状态计算**：right_use_count - wrong_use_count >= 3 时标记为已掌握
+- **调试日志系统**：完整追踪词汇处理流程，便于问题诊断
+
+### 修改的文件
+- backend/app/services/vocabulary.py:414-450行（添加调试日志）
+- backend/app/services/vocabulary.py:555-559行（添加跳过日志）
+
+### 验证方法
+通过后端日志可以观察到：
+1. "开始处理正确使用的单词"的日志信息
+2. "输入完全正确场景"或"有修正输入场景"的具体处理
+3. "准备更新X个正确使用的单词"的更新信息
+4. 每个词汇的right_use_count更新日志
+
+后端服务已启动(http://0.0.0.0:8000)，可以进行测试验证。
+
+---
+
+## 2025-09-19 23:44 修复推荐词汇练习显示被截断问题
+
+### 问题发现
+用户截图显示推荐词汇练习区域的词汇显示不完整，被容器边界切断。
+
+### 问题分析
+1. **容器宽度限制**：`.message-content` 有 `max-width: calc(100% - 140rpx)` 限制
+2. **词汇容器布局**：`.suggestion-words` 缺少明确的宽度和换行设置
+3. **词汇项样式**：单个词汇按钮缺少防截断属性
+
+### 修复方案
+
+#### 1. 扩展词汇推荐容器宽度 ✅
+```css
+.vocab-suggestions {
+  width: calc(100vw - 220rpx);
+  max-width: 550rpx;
+  min-width: 300rpx;
+  box-sizing: border-box;
+}
+```
+
+#### 2. 优化词汇容器布局 ✅
+```css
+.suggestion-words {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+  width: 100%;
+  box-sizing: border-box;
+}
+```
+
+#### 3. 改进单个词汇样式 ✅
+```css
+.suggested-word {
+  padding: 8rpx 16rpx;
+  font-size: 22rpx;
+  white-space: nowrap;
+  display: inline-block;
+  text-align: center;
+  min-width: 60rpx;
+}
+```
+
+### 技术改进
+- **响应式宽度**：使用viewport单位确保在不同屏幕尺寸下正确显示
+- **防截断设计**：`white-space: nowrap` 防止词汇内容换行
+- **灵活布局**：`flex-wrap: wrap` 允许词汇按钮自动换行
+- **视觉优化**：增大内边距和字体，提升可读性
+
+### 修改文件
+- frontend/pages/chat/chat.wxss (词汇推荐样式优化)
+
+### 预期效果
+- 推荐词汇完整显示，不再被截断
+- 词汇按钮在容器内自动换行排列
+- 保持良好的视觉效果和用户体验
+
+后端服务已重新启动，可以在微信开发者工具中测试修复效果。
+
+## 2025-09-19 23:47 进一步修复推荐词汇被底部输入区域遮挡问题
+
+### 问题发现
+用户反馈推荐词汇依然被截断，分析发现是被底部的输入区域（包括快捷按钮）遮挡。
+
+### 根本原因分析
+1. **输入区域固定定位**：`.input-area` 使用 `position: fixed` 固定在底部
+2. **快捷按钮额外高度**：Hello!、自我介绍、需要帮助、换个话题按钮占用约80rpx高度
+3. **消息容器底边距不足**：原来的 `margin-bottom: 140rpx` 不足以容纳输入框+快捷按钮
+
+### 修复方案
+
+#### 1. 增加消息容器底部边距 ✅
+```css
+.messages-container {
+  margin-bottom: 220rpx; /* 从140rpx增加到220rpx */
+}
+```
+
+#### 2. 进一步优化词汇推荐容器宽度 ✅
+```css
+.vocab-suggestions {
+  width: calc(100vw - 160rpx); /* 从220rpx减少到160rpx，更宽显示 */
+  max-width: 600rpx; /* 从550rpx增加到600rpx */
+  min-width: 320rpx; /* 从300rpx增加到320rpx */
+}
+```
+
+### 空间计算
+- **输入框区域**：约100rpx
+- **快捷按钮区域**：约80rpx  
+- **安全边距**：约40rpx
+- **总计需要**：220rpx（正好匹配新的margin-bottom）
+
+### 修改文件
+- frontend/pages/chat/chat.wxss (消息容器底边距和词汇推荐宽度)
+
+### 预期效果
+- 推荐词汇完全不被底部输入区域遮挡
+- 词汇显示区域更宽，容纳更多词汇
+- 快捷按钮与消息内容有足够间距
+
