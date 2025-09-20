@@ -49,6 +49,7 @@
         wx:key="id"
         id="msg-{{item.id}}"
       >
+        <!-- AI和系统消息：头像在左侧 -->
         <view class="message-avatar" wx:if="{{item.type === 'ai' || item.type === 'system'}}">
           <text class="avatar-icon" wx:if="{{item.type === 'ai'}}">🤖</text>
           <text class="avatar-icon" wx:if="{{item.type === 'system'}}">📊</text>
@@ -123,7 +124,8 @@
         </view>
         
         <view class="message-avatar" wx:if="{{item.type === 'user'}}">
-          <image class="avatar-img" src="{{userAvatar}}" mode="aspectFill"></image>
+          <text class="avatar-icon" wx:if="{{userAvatar === 'default_emoji' || !userAvatar}}">👤</text>
+          <image class="avatar-img" wx:else src="{{userAvatar}}" mode="aspectFill"></image>
         </view>
       </view>
 

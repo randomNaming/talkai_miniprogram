@@ -128,7 +128,7 @@
   flex: 1;
   padding: 20rpx 0;
   margin-top: calc(100rpx + env(safe-area-inset-top));
-  margin-bottom: 220rpx;
+  margin-bottom: 200rpx;
   overflow-y: auto;
 }
 
@@ -143,7 +143,8 @@
 }
 
 .message-item.user-message {
-  flex-direction: row-reverse;
+  flex-direction: row !important;
+  justify-content: flex-start !important;
 }
 
 .message-avatar {
@@ -159,6 +160,32 @@
   flex-shrink: 0;
 }
 
+/* AI消息头像在左侧 */
+.ai-message .message-avatar {
+  order: 1;
+}
+
+/* AI消息内容在右侧 */
+.ai-message .message-content {
+  order: 2;
+}
+
+/* 用户消息内容在左侧 */
+.user-message .message-content {
+  order: 1 !important;
+  margin-right: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  max-width: calc(100% - 100rpx) !important;
+}
+
+/* 用户消息头像在右侧 */
+.user-message .message-avatar {
+  order: 2 !important;
+  margin: 0 0 0 20rpx !important;
+}
+
 .avatar-icon {
   font-size: 28rpx;
 }
@@ -169,15 +196,16 @@
 }
 
 .message-content {
-  max-width: calc(100% - 140rpx);
+  max-width: calc(100% - 120rpx);
   min-width: 0;
+  width: 100%;
 }
 
-.user-message .message-content {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+.ai-message .message-content {
+  max-width: calc(100% - 100rpx);
 }
+
+/* 已在上面定义，这里删除重复项 */
 
 .message-bubble {
   background: white;
@@ -390,6 +418,7 @@
 /* Vocabulary Suggestions */
 .vocab-suggestions {
   margin-top: 16rpx;
+  margin-bottom: 16rpx;
   padding: 16rpx;
   background: #F8F9FE;
   border: 2rpx solid #E1E8FF;
@@ -484,13 +513,15 @@
 /* Message Actions */
 .message-actions {
   display: flex;
-  gap: 12rpx;
-  margin-top: 12rpx;
+  gap: 16rpx;
+  margin-top: 16rpx;
+  justify-content: flex-start;
+  align-items: center;
 }
 
 .action-btn-small {
-  width: 48rpx;
-  height: 48rpx;
+  width: 64rpx;
+  height: 64rpx;
   background: rgba(44, 90, 160, 0.1);
   border: none;
   border-radius: 50%;
@@ -498,6 +529,8 @@
   align-items: center;
   justify-content: center;
   transition: all 0.3s ease;
+  position: relative;
+  z-index: 10;
 }
 
 .action-btn-small::after {
@@ -506,10 +539,12 @@
 
 .action-btn-small:hover {
   background: rgba(44, 90, 160, 0.2);
+  transform: scale(1.1);
 }
 
 .action-icon-small {
-  font-size: 20rpx;
+  font-size: 28rpx;
+  line-height: 1;
 }
 
 /* Input Area */

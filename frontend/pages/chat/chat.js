@@ -55,7 +55,7 @@ Page({
     const settings = storage.getAppSettings();
     
     this.setData({
-      userAvatar: userInfo?.avatar_url || '/images/default_avatar.png',
+      userAvatar: userInfo?.avatar_url || 'default_emoji',
       welcomeTime: this.formatTime(new Date()),
       settings: {
         ...this.data.settings,
@@ -149,7 +149,7 @@ Page({
       const completeUserInfo = {
         id: result.user_id,
         nickname: loginData.nickname || 'User',
-        avatar_url: loginData.avatar_url || '/images/default_avatar.png',
+        avatar_url: loginData.avatar_url || 'default_emoji',
         is_new_user: result.is_new_user
       };
       
@@ -222,7 +222,7 @@ Page({
       const mockUser = {
         id: 'dev_user_' + Date.now(),
         nickname: 'Dev User',
-        avatar_url: '/images/default_avatar.png',
+        avatar_url: 'default_emoji',
         is_new_user: false
       };
       

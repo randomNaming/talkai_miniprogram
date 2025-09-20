@@ -28,7 +28,7 @@ function getMockResponseForEndpoint(url, method) {
     return {
       id: 'dev_user_123',
       nickname: 'Development User',
-      avatar_url: '/images/default_avatar.png',
+      avatar_url: 'default_emoji',  // 使用emoji替代头像
       grade: 'Primary School',
       total_usage_time: 0,
       chat_history_count: 0

@@ -21,30 +21,23 @@
     "selectedColor": "#2C5AA0",
     "backgroundColor": "#FFFFFF",
     "borderStyle": "black",
+    "fontSize": "22px",
     "list": [
       {
         "pagePath": "pages/chat/chat",
-        "text": "对话",
-        "iconPath": "images/chat.png",
-        "selectedIconPath": "images/chat_active.png"
+        "text": "💬 对话"
       },
       {
         "pagePath": "pages/vocab/vocab",
-        "text": "词汇",
-        "iconPath": "images/vocab.png",
-        "selectedIconPath": "images/vocab_active.png"
+        "text": "📚 词汇"
       },
       {
         "pagePath": "pages/dict/dict",
-        "text": "词典",
-        "iconPath": "images/dict.png",
-        "selectedIconPath": "images/dict_active.png"
+        "text": "📖 词典"
       },
       {
         "pagePath": "pages/profile/profile",
-        "text": "我的",
-        "iconPath": "images/profile.png",
-        "selectedIconPath": "images/profile_active.png"
+        "text": "👤 我的"
       }
     ]
   },

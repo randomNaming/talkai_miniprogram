@@ -1,0 +1,49 @@
+# TalkAI Mini Program Backend - Server Deployment Requirements
+# Python 3.11+ recommended
+
+# --- Web Framework ---
+fastapi==0.111.0
+uvicorn==0.30.1
+pydantic==2.7.4
+pydantic-settings==2.1.0
+
+# --- Database ---
+sqlalchemy==2.0.23
+alembic==1.13.0
+
+# --- Cache / Redis ---
+redis==5.0.1
+hiredis==2.2.3
+
+# --- HTTP Client ---
+httpx==0.25.2
+requests==2.31.0
+
+# --- Authentication & Security ---
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+
+# --- AI/ML Services ---
+sentence-transformers==3.0.1
+numpy==1.24.3
+huggingface_hub==0.23.0
+
+# --- LangChain Ecosystem ---
+langchain==0.2.11
+langchain-community==0.2.11
+langchain-openai==0.2.11
+
+# --- Utilities ---
+python-dotenv==1.0.0
+loguru==0.7.2
+APScheduler==3.10.4
+aiofiles==23.2.1
+
+# --- Testing (optional, remove in production) ---
+pytest==7.4.3
+pytest-asyncio==0.21.1
+
+# --- System dependencies (install separately) ---
+# - SQLite3 (usually pre-installed)
+# - Redis server (apt/yum install redis-server)
