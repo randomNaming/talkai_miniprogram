@@ -150,22 +150,100 @@ backend/
 
 ## 🔧 开发环境设置
 
-### 本地开发模式
+### 后端本地开发（推荐流程）
 
-**后端启动：**
+#### 1. 环境要求
+- Python **3.10+**（推荐 3.11）
+- 已安装 `git`
+
+#### 2. 虚拟环境配置（三选一）
+
+根据个人习惯选择以下任一方式创建并激活虚拟环境：
+
+**选项 A：使用 Conda（推荐 Anaconda/Miniconda 用户）**
 ```bash
-# 激活虚拟环境
-source /Users/pean/aiproject/talkai_mini/talkai_py/bookvidenv_new/bin/activate
+conda create -n talkai python=3.11
+conda activate talkai
+```
 
-# 启动后端服务
+**选项 B：使用 venv（Python 内置）**
+```bash
+# Windows
+python -m venv venv
+venv\Scripts\activate
+
+# macOS/Linux
+python3 -m venv venv
+source venv/bin/activate
+```
+
+**选项 C：系统级 Python（不推荐，可能污染全局环境）**
+```bash
+# 确保 Python 版本符合要求
+python --version  # 应 >= 3.10
+# 直接使用系统 pip 安装依赖（跳过虚拟环境创建步骤）
+```
+
+#### 3. 安装后端依赖
+
+进入后端目录并安装依赖包（使用 `requirements_manual.txt`）：
+
+```bash
+cd backend
+pip install -r requirements_manual.txt
+
+# 安装 LangChain 相关依赖（让 pip 自动选择兼容版本）
+pip install "langchain-openai" "langchain-community" "langchain"
+```
+
+**注意**：如果遇到依赖冲突，可先卸载冲突的包再重新安装：
+```bash
+pip uninstall -y transformers tokenizers
+pip install -r requirements_manual.txt
+pip install "langchain-openai" "langchain-community" "langchain"
+```
+
+#### 4. 启动后端服务
+
+```bash
+# 确保在 backend 目录下
 cd backend
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-**前端开发：**
+服务启动后访问：
+- API 文档：http://localhost:8000/docs
+- 健康检查：http://localhost:8000/health
+
+#### 5. 可选：配置离线模型（解决网络/SSL 问题）
+
+**场景**：服务器无法访问 `huggingface.co` 或遇到 SSL 证书错误。
+
+首次启动时会自动从 HuggingFace 下载 `sentence-transformers/all-MiniLM-L6-v2` 模型。如果下载失败：
+
+1. 在可联网环境下载模型：
+   ```bash
+   python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
+   ```
+
+2. 将下载的模型拷贝到 `backend/models/all-MiniLM-L6-v2`
+
+3. 修改 `backend/app/services/ai.py` 第 64 行：
+   ```python
+   # 修改前：
+   self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+   
+   # 修改后：
+   self.embedding_model = SentenceTransformer('models/all-MiniLM-L6-v2')
+   ```
+
+**影响范围**：不启用该模型仅影响**词汇相似度推荐**功能，核心的 AI 对话与语法纠正不受影响。
+
+### 前端本地开发
+
 1. 打开微信开发者工具
 2. 导入 `frontend/` 目录
-3. 前端自动检测环境并使用 `http://localhost:8000/api/v1`
+3. 确保后端已在 `http://localhost:8000` 启动，前端会自动使用 `http://localhost:8000/api/v1`
 
 **环境自动切换：**
 - **开发环境**：微信开发者工具 → `http://localhost:8000/api/v1`

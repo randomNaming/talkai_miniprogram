@@ -16,7 +16,47 @@ from langchain_openai import ChatOpenAI
 from langchain_community.chat_models import ChatOpenAI as CommunityOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.memory import ConversationBufferWindowMemory
+
+# Conversation memory: handle both old and new LangChain layouts
+try:
+    # Older LangChain versions
+    from langchain.memory import ConversationBufferWindowMemory  # type: ignore
+except ImportError:  # pragma: no cover
+    from collections import deque
+
+    class ConversationBufferWindowMemory:
+        """
+        Minimal fallback implementation compatible with the subset of
+        LangChain's ConversationBufferWindowMemory that this project uses.
+        """
+
+        def __init__(
+            self,
+            return_messages: bool = True,
+            memory_key: str = "chat_history",
+            input_key: str = "human_input",
+            output_key: str = "ai_output",
+            k: int = 3,
+        ):
+            self.return_messages = return_messages
+            self.memory_key = memory_key
+            self.input_key = input_key
+            self.output_key = output_key
+            self.k = k
+            self._buffer = deque(maxlen=2 * k)
+
+        def load_memory_variables(self, _: dict) -> dict:
+            # Project expects a dict with "chat_history" -> List[BaseMessage-like]
+            return {self.memory_key: list(self._buffer)}
+
+        def save_context(self, inputs: dict, outputs: dict) -> None:
+            # Store as simple dicts compatible with how this project reads them
+            human = inputs.get(self.input_key)
+            ai = outputs.get(self.output_key)
+            if human is not None:
+                self._buffer.append({"type": "human", "content": human})
+            if ai is not None:
+                self._buffer.append({"type": "ai", "content": ai})
 
 from app.core.config import settings
 from app.utils.prompts import (
